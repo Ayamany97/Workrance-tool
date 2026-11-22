@@ -58,7 +58,7 @@ def ico(name, sz=16, col="currentColor"):
 WA_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-left:6px;flex-shrink:0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zm-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741 1.456 1.282-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26C2.98 6.335 7.416 1.9 12.869 1.9c2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884zm8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>'
 
 st.set_page_config(page_title="Workrance", page_icon="🚛", layout="wide",
-                   initial_sidebar_state="expanded")
+                   initial_sidebar_state="auto")
 
 # ══════════════════════════════════════════════════════════
 # CSS
@@ -300,6 +300,14 @@ def mark_rem_done(phone, plate):
               headers=_h({"Prefer":"return=minimal"}), timeout=30)
     bust()
 
+def upd_violation(vid, status, notes=""):
+    d = {"status":status,"updated_at":datetime.now(RIYADH).isoformat()}
+    if notes: d["my_notes"] = notes
+    _hx.patch(f"{_base()}/rest/v1/violations",
+              params={"violation_id":f"eq.{vid}"},
+              json=d, headers=_h({"Prefer":"return=minimal"}), timeout=30)
+    bust()
+
 def add_payment(vid, name, phone, plate, amt, ptype, method,
                 receipt_url, receipt_ref, collector, other_col, verif, pdate, notes):
     _hx.post(f"{_base()}/rest/v1/payments",
@@ -374,7 +382,7 @@ def jlbl(j):
 def wa_link(phone, msg):
     n = wa_num(phone)
     if not n: return None
-    return f"https://web.whatsapp.com/send?phone={n}&text={urllib.parse.quote(msg)}"
+    return f"https://wa.me/{n}?text={urllib.parse.quote(msg)}"
 
 def wa_btn(url, label, color):
     if not url: return
@@ -521,10 +529,16 @@ def build_drivers(vdf, pdf, rems, today_iso):
         rk  = f"{phone}_{plate}"
         if rk in rems and not rems[rk].get("is_done") and str(rems[rk].get("reminder_date","9999")) <= today_iso:
             sk = "reminder"
-        prows     = [r for r in rows if str(r.get("system_status","")).strip() == "معلقة"]
-        tp        = sum(float(r.get("amount",0)) for r in prows if r.get("amount"))
         dpays     = pays_idx.get((name, plate), [])
-        conf_paid = sum(float(p.get("amount_paid",0)) for p in dpays if p.get("verification_status") == "مؤكد")
+        # violations paid (any payment recorded, confirmed or pending)
+        paid_vids = {p.get("violation_id") for p in dpays if p.get("violation_id")}
+        sys_pend  = [r for r in rows if str(r.get("system_status","")).strip() == "معلقة"]
+        # prows = unpaid pending violations (not covered by any payment)
+        prows     = [r for r in sys_pend if r.get("violation_id") not in paid_vids]
+        tp        = sum(float(r.get("amount",0)) for r in prows if r.get("amount"))
+        conf_paid = sum(float(p.get("amount_paid",0)) for p in dpays
+                        if p.get("verification_status") == "مؤكد"
+                        and p.get("violation_id") in {r.get("violation_id") for r in prows})
         remaining = max(0, tp - conf_paid)
         result.append({
             "key":key, "name":name, "phone":phone, "plate":plate,
@@ -599,6 +613,17 @@ def pg_drivers(user):
            if fm.get(d["sk"],True)
            and (not srch or srch in d["name"] or srch.upper() in d["plate"].upper())]
 
+    # pagination — reset page when search/filter changes
+    _filter_sig = f"{srch}|{fn}{fr}{fc}{fp}{fpa}{fnt}{fd}"
+    if st.session_state.get("_fsig") != _filter_sig:
+        st.session_state["_fsig"] = _filter_sig
+        st.session_state["drv_page"] = 0
+    PER_PAGE   = 20
+    total_pgs  = max(1, (len(shown) + PER_PAGE - 1) // PER_PAGE)
+    cur_page   = min(st.session_state.get("drv_page", 0), total_pgs - 1)
+    page_start = cur_page * PER_PAGE
+    page_shown = shown[page_start : page_start + PER_PAGE]
+
     # ── stat strip (custom HTML) ──
     cnt={k:sum(1 for d in drivers if d["sk"]==k) for k in PR}
     cards_html = ""
@@ -616,9 +641,14 @@ def pg_drivers(user):
 
     # ── driver list ──
     with left:
-        st.markdown(f"<div style='font-size:12px;color:#64748b;margin-bottom:6px'>{ico('users',13,'#64748b')} {len(shown)} سائق</div>",
-                    unsafe_allow_html=True)
-        for i, d in enumerate(shown):
+        pg_lbl = f"صفحة {cur_page+1}/{total_pgs}" if total_pgs>1 else ""
+        st.markdown(
+            f"<div style='font-size:12px;color:#64748b;margin-bottom:6px;display:flex;justify-content:space-between'>"
+            f"<span>{ico('users',13,'#64748b')} {len(shown)} سائق</span>"
+            f"<span>{pg_lbl}</span></div>",
+            unsafe_allow_html=True)
+
+        for i, d in enumerate(page_shown):
             rem_disp = famt(d["remaining"]) if d["remaining"]>0 else famt(d["tp"])
             sel_cls  = "drv-sel" if st.session_state.get("sel")==d["key"] else ""
             st.markdown(
@@ -635,11 +665,23 @@ def pg_drivers(user):
                 f'</div>',
                 unsafe_allow_html=True)
             st.markdown('<div class="drv-open">', unsafe_allow_html=True)
-            if st.button("فتح", key=f"d{i}", use_container_width=True):
+            if st.button("فتح", key=f"d{page_start+i}", use_container_width=True):
                 st.session_state.sel=d["key"]
                 st.session_state.sf=st.session_state.pf=st.session_state.sysv=False
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
+
+        # pagination controls
+        if total_pgs > 1:
+            pc1,pc2,pc3 = st.columns([1,2,1])
+            with pc1:
+                if cur_page>0 and st.button("→ السابق",use_container_width=True,key="pg_prev"):
+                    st.session_state.drv_page=cur_page-1; st.rerun()
+            with pc2:
+                st.markdown(f"<div style='text-align:center;color:#475569;font-size:12px;padding-top:10px'>{cur_page+1} / {total_pgs}</div>",unsafe_allow_html=True)
+            with pc3:
+                if cur_page<total_pgs-1 and st.button("التالي ←",use_container_width=True,key="pg_next"):
+                    st.session_state.drv_page=cur_page+1; st.rerun()
 
     # ── driver detail ──
     with right:
@@ -702,11 +744,16 @@ def pg_drivers(user):
         # ── violations ──
         st.markdown(f"<div style='font-size:12px;color:#64748b;margin-bottom:6px'>{ico('file',13,'#64748b')} المخالفات</div>",
                     unsafe_allow_html=True)
+        dpays_vids = {p.get("violation_id") for p in sel["pays"]}
         for v in sel["rows"]:
             ss   = str(v.get("system_status","")).strip()
-            paid = "مدفوع" in ss
+            st_v = str(v.get("status","")).strip()
+            vid  = v.get("violation_id","")
+            paid = ("مدفوع" in ss or "تم الدفع" in st_v or "مدفوع" in st_v
+                    or vid in dpays_vids)
             icon_html = (f'{ico("check-c",15,"#22c55e")}' if paid
                          else f'{ico("x-c",15,"#ef4444")}')
+            paid_lbl = " — مدفوعة" if paid and vid in dpays_vids else ""
             st.markdown(
                 f'<div class="viol-row {"viol-paid" if paid else "viol-unpaid"}">'
                 f'  <span class="viol-icon">{icon_html}</span>'
@@ -714,7 +761,8 @@ def pg_drivers(user):
                 f'    <b>{jlbl(v.get("authority"))}</b>'
                 f'    <span style="color:#475569"> · {fdt(v.get("violation_date"))} · </span>'
                 f'    <b>{famt(v.get("amount"))} ريال</b>'
-                f'    <br><small style="color:#334155">{ss} &nbsp; {v.get("violation_id","")}</small>'
+                f'    <span style="color:#22c55e;font-size:11px">{paid_lbl}</span>'
+                f'    <br><small style="color:#334155">{ss} &nbsp; {vid}</small>'
                 f'  </span>'
                 f'</div>',
                 unsafe_allow_html=True)
@@ -811,45 +859,60 @@ def pg_drivers(user):
             st.divider()
             st.markdown(f"<div style='font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:8px'>{ico('dollar',16,'#60a5fa')} تسجيل دفعة</div>",
                         unsafe_allow_html=True)
-            pt=st.radio("نوع الدفع:",["كامل","جزئي"],horizontal=True,key=f"pt_{sk}")
-            default_amt=float(sel["remaining"]) if sel["remaining"]>0 else float(sel["tp"])
-            if pt=="جزئي":
-                amt=st.number_input("المبلغ المدفوع (ريال):",min_value=0.01,value=default_amt/2,key=f"amt_{sk}")
-            else:
-                amt=default_amt
-                st.info(f"المبلغ الكامل: {famt(amt)} ريال")
-            pc1,pc2=st.columns(2)
-            with pc1: pm=st.selectbox("طريقة الدفع:",["تحويل بنكي","نقد","آخر"],key=f"pm_{sk}")
-            with pc2: pd_=st.date_input("تاريخ الدفع:",value=today,key=f"pdd_{sk}")
-            col=st.radio("من جمّع؟",["أحمد","رهف","آخر"],horizontal=True,key=f"col_{sk}")
-            other=""
-            if col=="آخر": other=st.text_input("اسم الموظف:",key=f"oc_{sk}")
-            verif=st.radio("الحالة:",["بانتظار التأكيد من المحاسبة","مؤكد"],horizontal=True,key=f"vr_{sk}")
-            rref=""; rurl=""
-            if pm=="تحويل بنكي":
-                rref=st.text_input("رقم الإيصال / المرجع:",key=f"rr_{sk}")
-                rf=st.file_uploader("صورة الإيصال:",type=["jpg","jpeg","png","pdf"],key=f"rf_{sk}")
-            else: rf=None
-            pnts=st.text_area("ملاحظة:",key=f"pnts_{sk}",placeholder="اختياري...")
-            ps1,ps2=st.columns(2)
-            with ps1:
-                if st.button("حفظ الدفعة",type="primary",key=f"psv_{sk}",use_container_width=True):
-                    if amt<=0: st.error("أدخل مبلغاً صحيحاً")
-                    else:
-                        if rf: rurl=upload_receipt(rf,str(uuid.uuid4())[:8])
-                        vid=sel["prows"][0].get("violation_id","") if sel["prows"] else ""
-                        add_payment(vid,sel["name"],sel["phone"],sel["plate"],
-                                    amt,pt,pm,rurl,rref if pm=="تحويل بنكي" else "",
-                                    col,other,verif,pd_.strftime("%d-%m-%Y"),pnts)
-                        new_sk=("تم الدفع" if pt=="كامل" and verif=="مؤكد"
-                                else "بانتظار تأكيد الدفع" if verif!="مؤكد"
-                                else "مدفوع جزئياً")
-                        upd_status(sel["name"],sel["phone"],sel["plate"],new_sk)
-                        st.toast(f"✓ تم تسجيل {famt(amt)} ريال — {sel['name']}")
-                        st.session_state.pf=False; bust(); st.rerun()
-            with ps2:
-                if st.button("إلغاء",key=f"pcc_{sk}",use_container_width=True):
+            pviols_pay = sel["prows"]
+            if not pviols_pay:
+                st.info("جميع مخالفات هذا السائق مسجّلة كمدفوعة.")
+                if st.button("إغلاق",key=f"pcc_empty_{sk}",use_container_width=True):
                     st.session_state.pf=False; st.rerun()
+            else:
+                # violation selector
+                viol_opts = {
+                    f"{jlbl(v.get('authority'))}  ·  {fdt(v.get('violation_date'))}  ·  {famt(v.get('amount'))} ريال": v
+                    for v in pviols_pay
+                }
+                sv_lbl = st.selectbox("المخالفة:", list(viol_opts.keys()), key=f"vs_{sk}")
+                sv     = viol_opts[sv_lbl]
+                default_amt = float(sv.get("amount",0))
+
+                pt=st.radio("نوع الدفع:",["كامل","جزئي"],horizontal=True,key=f"pt_{sk}")
+                if pt=="جزئي":
+                    amt=st.number_input("المبلغ المدفوع (ريال):",min_value=0.01,
+                                        value=round(default_amt/2,2),key=f"amt_{sk}")
+                else:
+                    amt=default_amt
+                    st.info(f"المبلغ الكامل: {famt(amt)} ريال")
+                pc1,pc2=st.columns(2)
+                with pc1: pm=st.selectbox("طريقة الدفع:",["تحويل بنكي","نقد","آخر"],key=f"pm_{sk}")
+                with pc2: pd_=st.date_input("تاريخ الدفع:",value=today,key=f"pdd_{sk}")
+                col=st.radio("من جمّع؟",["أحمد","رهف","آخر"],horizontal=True,key=f"col_{sk}")
+                other=""
+                if col=="آخر": other=st.text_input("اسم الموظف:",key=f"oc_{sk}")
+                verif=st.radio("الحالة:",["بانتظار التأكيد من المحاسبة","مؤكد"],horizontal=True,key=f"vr_{sk}")
+                rref=""; rurl=""
+                if pm=="تحويل بنكي":
+                    rref=st.text_input("رقم الإيصال / المرجع:",key=f"rr_{sk}")
+                    rf=st.file_uploader("صورة الإيصال:",type=["jpg","jpeg","png","pdf"],key=f"rf_{sk}")
+                else: rf=None
+                pnts=st.text_area("ملاحظة:",key=f"pnts_{sk}",placeholder="اختياري...")
+                ps1,ps2=st.columns(2)
+                with ps1:
+                    if st.button("حفظ الدفعة",type="primary",key=f"psv_{sk}",use_container_width=True):
+                        if amt<=0: st.error("أدخل مبلغاً صحيحاً")
+                        else:
+                            if rf: rurl=upload_receipt(rf,str(uuid.uuid4())[:8])
+                            vid = sv.get("violation_id","")
+                            add_payment(vid,sel["name"],sel["phone"],sel["plate"],
+                                        amt,pt,pm,rurl,rref if pm=="تحويل بنكي" else "",
+                                        col,other,verif,pd_.strftime("%d-%m-%Y"),pnts)
+                            today_d,_,full_d=now_sa_str()
+                            new_vst=(f"تم الدفع {full_d}" if pt=="كامل"
+                                     else f"مدفوع جزئي {full_d}")
+                            upd_violation(vid, new_vst, pnts)
+                            st.toast(f"✓ {famt(amt)} ريال — {jlbl(sv.get('authority'))}")
+                            st.session_state.pf=False; bust(); st.rerun()
+                with ps2:
+                    if st.button("إلغاء",key=f"pcc_{sk}",use_container_width=True):
+                        st.session_state.pf=False; st.rerun()
 
 # ══════════════════════════════════════════════════════════
 # PAGE: المدفوعات
