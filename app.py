@@ -189,16 +189,11 @@ section[data-testid="stSidebar"] {
 section[data-testid="stSidebar"]::before,
 section[data-testid="stSidebar"]::after { display:none!important; }
 
-/* ── HIDE SIDEBAR RESIZE HANDLE ── */
+/* ── HIDE SIDEBAR RESIZE HANDLE (the persistent left-edge line) ── */
 [data-testid="stSidebarResizeHandle"],
 [data-testid="stSidebarResizeHandle"] * { display:none!important; width:0!important; }
-/* target by cursor style (inline) — both naming variants */
-div[style*="col-resize"], div[style*="ew-resize"],
-div[style*="cursor: col-resize"], div[style*="cursor: ew-resize"] {
-    display:none!important; width:0!important; opacity:0!important;
-}
-/* target the direct sibling div after the sidebar section */
-section[data-testid="stSidebar"] + div { display:none!important; width:0!important; }
+/* fallback: any thin col-resize cursor divs Streamlit injects */
+div[style*="col-resize"] { display:none!important; }
 section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!important; }
 [data-testid="stSidebar"] .stRadio > div { gap:2px!important; }
 [data-testid="stSidebar"] .stRadio label { border-radius:8px!important; padding:10px 14px!important; font-size:14px!important; transition:background .15s!important; }
@@ -224,8 +219,14 @@ section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!impo
     background:rgba(96,165,250,.2)!important;
     border-radius:8px!important; border:1px solid #334155!important;
 }
-/* collapsed control overlaps the stats strip — hide it, sidebar opens via toolbar > */
-[data-testid="collapsedControl"] { display:none!important; }
+[data-testid="collapsedControl"] {
+    background:#0d1626!important;
+    border:2px solid #334155!important;
+    box-shadow:-3px 0 10px rgba(0,0,0,.4)!important;
+}
+[data-testid="collapsedControl"] button {
+    color:#93c5fd!important; opacity:1!important; font-size:16px!important;
+}
 
 /* ── METRICS (payments/reports page) ── */
 div[data-testid="metric-container"] {
