@@ -66,7 +66,10 @@ st.set_page_config(page_title="Workrance", page_icon="🚛", layout="wide",
 st.markdown("""<style>
 
 /* ── BASE ── */
-.stApp { direction:rtl; background:#0a0f1e; }
+.stApp { background:#0a0f1e; }
+/* RTL on content only — NOT on .stApp so sidebar stays left-anchored */
+.block-container { direction:rtl; }
+[data-testid="stSidebar"] > div { direction:rtl; }
 .stTextArea textarea, .stTextInput input { direction:rtl; font-family:'Segoe UI',Tahoma,Arial,sans-serif; }
 .stTextArea textarea { line-height:1.85; font-size:14px; }
 .block-container { padding-top:4rem!important; padding-bottom:2rem!important; }
@@ -182,20 +185,10 @@ header[data-testid="stHeader"] { background:rgba(10,15,30,0.95)!important; backd
 /* ── SIDEBAR ── */
 section[data-testid="stSidebar"] {
     background:linear-gradient(180deg,#0d1626,#0a0f1e)!important;
-    border-left:1px solid #1e293b;
+    border-right:1px solid #1e293b;
 }
 @media (min-width:768px) {
     section[data-testid="stSidebar"] { min-width:220px!important; max-width:220px!important; }
-}
-@media (max-width:767px) {
-    section[data-testid="stSidebar"] {
-        position:fixed!important;
-        left:0!important; right:auto!important;
-        top:0!important; height:100vh!important;
-        z-index:1000!important;
-        width:82vw!important; max-width:300px!important;
-        box-shadow:4px 0 24px rgba(0,0,0,.6)!important;
-    }
 }
 section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!important; }
 [data-testid="stSidebar"] .stRadio > div { gap:2px!important; }
