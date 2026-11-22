@@ -351,8 +351,9 @@ def upd_status(name, phone, plate, status, notes="", cdate=""):
     d = {"status":status,"updated_at":datetime.now(RIYADH).isoformat()}
     if cdate: d["contact_date"] = cdate
     if notes: d["my_notes"] = notes
+    db_phone = "" if phone == "بلا رقم" else phone
     _hx.patch(f"{_base()}/rest/v1/violations",
-              params={"driver_name":f"eq.{name}","phone":f"eq.{phone}","plate":f"eq.{plate}"},
+              params={"driver_name":f"eq.{name}","phone":f"eq.{db_phone}","plate":f"eq.{plate}"},
               json=d, headers=_h({"Prefer":"return=minimal"}), timeout=30)
     bust()
 
@@ -500,7 +501,7 @@ def get_sk(statuses):
     if not vals: return "new"
     if any("مدفوع جزئي" in v or "جزئي" in v for v in vals): return "partial"
     if any("تم الدفع" in v or "مدفوع" in v for v in vals) and all(
-        "مدفوع" in v or v.strip()=="تم" for v in vals): return "done"
+        "مدفوع" in v or "تم الدفع" in v or v.strip()=="تم" for v in vals): return "done"
     if any(v.strip()=="تم" for v in vals): return "done"
     if any("بانتظار تأكيد" in v for v in vals): return "partial"
     if any("تم التبليغ" in v or "تم التبيلغ" in v for v in vals): return "notified"
