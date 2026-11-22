@@ -187,10 +187,9 @@ section[data-testid="stSidebar"] {
     outline:none!important;
     box-shadow:none!important;
 }
-/* Gradient only on the inner content — visible when open, irrelevant when collapsed */
+/* Gradient only on the inner content — visible when open */
 section[data-testid="stSidebar"] > div:first-child {
     background:linear-gradient(180deg,#0d1626,#0a0f1e)!important;
-    min-height:100vh!important;
 }
 section[data-testid="stSidebar"]::before,
 section[data-testid="stSidebar"]::after { display:none!important; }
@@ -269,6 +268,28 @@ div[data-testid="stMetricValue"] { font-size:26px!important;font-weight:800!impo
 }
 
 </style>""", unsafe_allow_html=True)
+
+# ── JS: hide resize handle regardless of selector/class ──
+import streamlit.components.v1 as _cv1
+_cv1.html("""<script>
+(function(){
+  var pd=window.parent.document;
+  function hideResize(){
+    pd.querySelectorAll('*').forEach(function(el){
+      var cs=window.parent.getComputedStyle(el);
+      if(cs.cursor==='col-resize'||cs.cursor==='ew-resize'){
+        el.style.setProperty('display','none','important');
+        el.style.setProperty('width','0','important');
+        el.style.setProperty('min-width','0','important');
+        el.style.setProperty('max-width','0','important');
+        el.style.setProperty('overflow','hidden','important');
+      }
+    });
+  }
+  hideResize();
+  new MutationObserver(hideResize).observe(pd.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class']});
+})();
+</script>""", height=0)
 
 # ══════════════════════════════════════════════════════════
 # HTTP — direct PostgREST
