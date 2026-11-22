@@ -188,6 +188,12 @@ section[data-testid="stSidebar"] {
 }
 section[data-testid="stSidebar"]::before,
 section[data-testid="stSidebar"]::after { display:none!important; }
+
+/* ── HIDE SIDEBAR RESIZE HANDLE (the persistent left-edge line) ── */
+[data-testid="stSidebarResizeHandle"],
+[data-testid="stSidebarResizeHandle"] * { display:none!important; width:0!important; }
+/* fallback: any thin col-resize cursor divs Streamlit injects */
+div[style*="col-resize"] { display:none!important; }
 section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!important; }
 [data-testid="stSidebar"] .stRadio > div { gap:2px!important; }
 [data-testid="stSidebar"] .stRadio label { border-radius:8px!important; padding:10px 14px!important; font-size:14px!important; transition:background .15s!important; }
