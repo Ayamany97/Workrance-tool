@@ -67,7 +67,6 @@ st.markdown("""<style>
 
 /* ── BASE ── */
 .stApp { direction:rtl; background:#0a0f1e; }
-body { background:#0a0f1e!important; }
 .stTextArea textarea, .stTextInput input { direction:rtl; font-family:'Segoe UI',Tahoma,Arial,sans-serif; }
 .stTextArea textarea { line-height:1.85; font-size:14px; }
 .block-container { padding-top:4rem!important; padding-bottom:2rem!important; }
@@ -190,26 +189,11 @@ section[data-testid="stSidebar"] {
 section[data-testid="stSidebar"]::before,
 section[data-testid="stSidebar"]::after { display:none!important; }
 
-/* ── HIDE SIDEBAR RESIZE HANDLE ── */
+/* ── HIDE SIDEBAR RESIZE HANDLE (the persistent left-edge line) ── */
 [data-testid="stSidebarResizeHandle"],
-[data-testid="stSidebarResizeHandle"] * {
-    display:none!important; width:0!important; opacity:0!important;
-}
-/* Broader fallbacks covering all cursor variants and class names */
-div[style*="col-resize"], div[style*="ew-resize"],
-div[style*="cursor: col-resize"], div[style*="cursor: ew-resize"] {
-    display:none!important; width:0!important; opacity:0!important;
-}
-/* Sidebar section: blend into app bg so thin collapsed strip is invisible */
-section[data-testid="stSidebar"] {
-    background:#0a0f1e!important;
-}
-/* Gradient only on the inner content div (shows when open) */
-section[data-testid="stSidebar"] > div:first-child {
-    background:linear-gradient(180deg,#0d1626,#0a0f1e)!important;
-    min-height:100vh!important;
-}
-section[data-testid="stSidebar"] > div { border:none!important; }
+[data-testid="stSidebarResizeHandle"] * { display:none!important; width:0!important; }
+/* fallback: any thin col-resize cursor divs Streamlit injects */
+div[style*="col-resize"] { display:none!important; }
 section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!important; }
 [data-testid="stSidebar"] .stRadio > div { gap:2px!important; }
 [data-testid="stSidebar"] .stRadio label { border-radius:8px!important; padding:10px 14px!important; font-size:14px!important; transition:background .15s!important; }
@@ -1479,24 +1463,6 @@ def pg_reminders(user):
 def main():
     for k,v in [("user","أحمد"),("sel",None),("rem_sel",None),("sf",False),("pf",False),("sysv",False)]:
         if k not in st.session_state: st.session_state[k]=v
-
-    # Hide sidebar resize handle (the thin bright line) via JS as CSS fallback
-    import streamlit.components.v1 as _c
-    _c.html("""<script>
-(function(){
-  var pd=window.parent.document;
-  function hide(){
-    pd.querySelectorAll('div').forEach(function(d){
-      var cs=window.parent.getComputedStyle(d);
-      if(cs.cursor==='col-resize'||cs.cursor==='ew-resize'){
-        d.style.cssText='display:none!important;width:0!important;overflow:hidden!important';
-      }
-    });
-  }
-  hide();
-  new MutationObserver(hide).observe(pd.body,{childList:true,subtree:true});
-})();
-</script>""", height=0)
 
     with st.sidebar:
         st.markdown(
