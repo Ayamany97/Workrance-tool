@@ -341,7 +341,7 @@ def _rems():
     except Exception: return {}
 
 def bust():
-    _viols.clear(); _pays.clear(); _notifs.clear(); _rems.clear()
+    st.cache_data.clear()
 
 # ══════════════════════════════════════════════════════════
 # DATA — WRITE
