@@ -342,7 +342,6 @@ def _rems():
 
 def bust():
     _viols.clear(); _pays.clear(); _notifs.clear(); _rems.clear()
-    build_drivers.clear()
 
 # ══════════════════════════════════════════════════════════
 # DATA — WRITE
@@ -591,7 +590,6 @@ def gen_reminder(name, plate, viols, user, pays=None):
 # ══════════════════════════════════════════════════════════
 # BUILD DRIVER LIST
 # ══════════════════════════════════════════════════════════
-@st.cache_data(ttl=60)
 def build_drivers(vdf, pdf, rems, today_iso):
     if vdf.empty: return []
     # to_dict('records') + pure-Python loop is ~10x faster than iterrows()
