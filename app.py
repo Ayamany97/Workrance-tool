@@ -191,35 +191,14 @@ section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!impo
 [data-testid="stSidebar"] .stCheckbox label { font-size:13px!important; }
 
 /* ── MOBILE SIDEBAR — fix RTL collapse direction ── */
-/* Streamlit collapses with translateX(-110%) which in RTL lands at center.
-   We anchor the sidebar to right:0 and redirect the negative-X collapse
-   to positive-X so it exits off-screen to the RIGHT. */
+/* Streamlit collapses with translateX(-110%) which in RTL moves toward center.
+   We only intercept that specific case and redirect it off-screen to the right.
+   Everything else (position, width, layout) is left to Streamlit's own CSS. */
 @media (max-width:768px) {
-    section[data-testid="stSidebar"] {
-        position:fixed!important;
-        right:0!important; left:auto!important;
-        top:0!important; height:100vh!important;
-        z-index:999!important;
-        width:82vw!important; max-width:300px!important;
-        transform:translateX(0)!important;
-        transition:transform .25s ease!important;
-        box-shadow:-4px 0 20px rgba(0,0,0,.5)!important;
-    }
-    /* Intercept Streamlit's negative-X collapse → redirect to right */
     section[data-testid="stSidebar"][style*="translateX(-"] {
         transform:translateX(110%)!important;
-    }
-    /* Open (>>) button — pin to right edge */
-    [data-testid="collapsedControl"] {
-        position:fixed!important;
-        right:0!important; left:auto!important;
-        top:50%!important;
-        transform:translateY(-50%)!important;
-        z-index:998!important;
-        border-radius:10px 0 0 10px!important;
-        border-right:none!important;
-        border-left:2px solid #334155!important;
-        padding:8px 6px!important;
+        visibility:hidden!important;
+        box-shadow:none!important;
     }
 }
 
