@@ -111,6 +111,7 @@ header[data-testid="stHeader"] { background:rgba(10,15,30,0.95)!important; backd
 .dc-info { flex:1; min-width:0; }
 .dc-name { font-size:14px; font-weight:700; color:#f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
 .dc-sub  { font-size:11px; color:#475569; margin-top:4px; display:flex; align-items:center; gap:5px; }
+.dc-note { font-size:10px; color:#64748b; margin-top:3px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; font-style:italic; }
 .dc-side { text-align:left; flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
 .dc-badge { display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap; }
 .dc-amt  { font-size:11px; color:#64748b; font-weight:600; }
@@ -182,7 +183,9 @@ header[data-testid="stHeader"] { background:rgba(10,15,30,0.95)!important; backd
 section[data-testid="stSidebar"] {
     background:linear-gradient(180deg,#0d1626,#0a0f1e)!important;
     border-left:1px solid #1e293b;
-    min-width:220px!important; max-width:220px!important;
+}
+@media (min-width:768px) {
+    section[data-testid="stSidebar"] { min-width:220px!important; max-width:220px!important; }
 }
 section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!important; }
 [data-testid="stSidebar"] .stRadio > div { gap:2px!important; }
@@ -582,12 +585,14 @@ def build_drivers(vdf, pdf, rems, today_iso):
                         if p.get("verification_status") == "مؤكد"
                         and p.get("violation_id") in {r.get("violation_id") for r in prows})
         remaining = max(0, tp - conf_paid)
+        latest_note = next((str(r.get("my_notes","")).strip() for r in sorted(rows, key=lambda x: str(x.get("contact_date","") or ""), reverse=True) if str(r.get("my_notes","")).strip() not in ("","nan","None")), "")
         result.append({
             "key":key, "name":name, "phone":phone, "plate":plate,
             "sk":sk, "label":SL.get(sk, sk),
             "rows":rows, "prows":prows, "count":len(rows),
             "tp":tp, "conf_paid":conf_paid, "remaining":remaining,
             "pays":dpays, "rem":rems.get(rk, {}),
+            "note":latest_note,
         })
     result.sort(key=lambda d: (PR.get(d["sk"], 99), d["name"]))
     return result
@@ -609,7 +614,7 @@ def pg_drivers(user):
     with st.sidebar:
         show_all = st.toggle("عرض الكل", value=False)
         if show_all:
-            fn=fr=fc=fp=fpa=fnt=fd=True
+            fn=fr=fc=fp=fpa=fnt=fd=fnph=fnwa=fnc=True
         else:
             fn  = st.checkbox("🔴 جديد",        value=True)
             fr  = st.checkbox("🔔 تذكير اليوم", value=True)
@@ -618,6 +623,9 @@ def pg_drivers(user):
             fpa = st.checkbox("🟣 دفع جزئي",   value=True)
             fnt = st.checkbox("🔵 تم التبليغ", value=False)
             fd  = st.checkbox("🟢 تم",          value=False)
+            fnph= st.checkbox("⚫ بلا رقم",     value=True)
+            fnwa= st.checkbox("⚫ بلا واتساب",  value=True)
+            fnc = st.checkbox("⚫ لا داعي",     value=False)
         st.divider()
         srch=st.text_input("",placeholder="بحث: اسم أو لوحة...",label_visibility="collapsed")
         sc1, sc2 = st.columns([1,1])
@@ -642,13 +650,14 @@ def pg_drivers(user):
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True, key="exp_noph")
 
-    fm={"new":fn,"reminder":fr,"check":fc,"pending":fp,"partial":fpa,"notified":fnt,"done":fd}
+    fm={"new":fn,"reminder":fr,"check":fc,"pending":fp,"partial":fpa,"notified":fnt,"done":fd,
+        "no_phone":fnph,"no_wa":fnwa,"no_contact":fnc}
     shown=[d for d in drivers
            if fm.get(d["sk"],True)
            and (not srch or srch in d["name"] or srch.upper() in d["plate"].upper())]
 
     # pagination — reset page when search/filter changes
-    _filter_sig = f"{srch}|{fn}{fr}{fc}{fp}{fpa}{fnt}{fd}"
+    _filter_sig = f"{srch}|{fn}{fr}{fc}{fp}{fpa}{fnt}{fd}{fnph}{fnwa}{fnc}"
     if st.session_state.get("_fsig") != _filter_sig:
         st.session_state["_fsig"] = _filter_sig
         st.session_state["drv_page"] = 0
@@ -683,28 +692,39 @@ def pg_drivers(user):
             f"<span>{pg_lbl}</span></div>",
             unsafe_allow_html=True)
 
-        for i, d in enumerate(page_shown):
-            rem_disp = famt(d["remaining"]) if d["remaining"]>0 else famt(d["tp"])
-            sel_cls  = "drv-sel" if st.session_state.get("sel")==d["key"] else ""
-            st.markdown(
-                f'<div class="drv-card drv-{d["sk"]} {sel_cls}">'
-                f'  <div class="dc-info">'
-                f'    <span class="dc-name">{d["name"]}</span>'
-                f'    <span class="dc-sub">{ico("car",12,"#475569")} {d["plate"]}'
-                f'      <span style="color:#334155">·</span> {d["count"]} مخالفة</span>'
-                f'  </div>'
-                f'  <div class="dc-side">'
-                f'    <span class="dc-badge b-{d["sk"]}">{SL_SHORT.get(d["sk"],d["sk"])}</span>'
-                f'    <span class="dc-amt">{rem_disp} ر</span>'
-                f'  </div>'
-                f'</div>',
-                unsafe_allow_html=True)
-            st.markdown('<div class="drv-open">', unsafe_allow_html=True)
-            if st.button("فتح", key=f"d{page_start+i}", use_container_width=True):
-                st.session_state.sel=d["key"]
-                st.session_state.sf=st.session_state.pf=st.session_state.sysv=False
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+        for i in range(0, len(page_shown), 2):
+            gc1, gc2 = st.columns(2)
+            for j, col in enumerate([gc1, gc2]):
+                idx = i + j
+                if idx >= len(page_shown):
+                    break
+                d = page_shown[idx]
+                with col:
+                    rem_disp = famt(d["remaining"]) if d["remaining"]>0 else famt(d["tp"])
+                    sel_cls  = "drv-sel" if st.session_state.get("sel")==d["key"] else ""
+                    note_prev = str(d.get("note","")).strip()
+                    note_prev = "" if note_prev in ("","nan","None") else note_prev[:40] + ("…" if len(note_prev)>40 else "")
+                    note_line = f'<span class="dc-note">{note_prev}</span>' if note_prev else ""
+                    st.markdown(
+                        f'<div class="drv-card drv-{d["sk"]} {sel_cls}">'
+                        f'  <div class="dc-info">'
+                        f'    <span class="dc-name">{d["name"]}</span>'
+                        f'    <span class="dc-sub">{ico("car",12,"#475569")} {d["plate"]}'
+                        f'      <span style="color:#334155">·</span> {d["count"]} مخالفة</span>'
+                        f'    {note_line}'
+                        f'  </div>'
+                        f'  <div class="dc-side">'
+                        f'    <span class="dc-badge b-{d["sk"]}">{SL_SHORT.get(d["sk"],d["sk"])}</span>'
+                        f'    <span class="dc-amt">{rem_disp} ر</span>'
+                        f'  </div>'
+                        f'</div>',
+                        unsafe_allow_html=True)
+                    st.markdown('<div class="drv-open">', unsafe_allow_html=True)
+                    if st.button("فتح", key=f"d{page_start+idx}", use_container_width=True):
+                        st.session_state.sel=d["key"]
+                        st.session_state.sf=st.session_state.pf=st.session_state.sysv=False
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
 
         # pagination controls
         if total_pgs > 1:
