@@ -263,6 +263,7 @@ def _rems():
 
 def bust():
     _viols.clear(); _pays.clear(); _notifs.clear(); _rems.clear()
+    build_drivers.clear()
 
 # ══════════════════════════════════════════════════════════
 # DATA — WRITE
@@ -486,38 +487,46 @@ def gen_reminder(name, plate, viols, user, pays=None):
 # ══════════════════════════════════════════════════════════
 # BUILD DRIVER LIST
 # ══════════════════════════════════════════════════════════
+@st.cache_data(ttl=60)
 def build_drivers(vdf, pdf, rems, today_iso):
     if vdf.empty: return []
-    vdf = vdf.copy()
-    vdf["_ph"] = vdf["phone"].apply(lambda x: cp(x) or "بلا رقم")
-    vdf["_pl"] = vdf["plate"].apply(lambda x: str(x).strip() if x else "غير محدد")
+    # to_dict('records') + pure-Python loop is ~10x faster than iterrows()
+    records = vdf.to_dict("records")
+    pays_records = pdf.to_dict("records") if not pdf.empty else []
+
+    # pre-index payments by (name, plate) for O(1) lookup
+    pays_idx = {}
+    for p in pays_records:
+        k = (p.get("driver_name",""), p.get("plate",""))
+        pays_idx.setdefault(k, []).append(p)
+
     groups = {}
-    for _, row in vdf.iterrows():
-        key=(str(row.get("driver_name","")).strip(), row["_ph"], row["_pl"])
-        groups.setdefault(key,[]).append(row.to_dict())
-    result=[]
-    for key,rows in groups.items():
-        name,phone,plate=key
-        sk=get_sk([r.get("status","") for r in rows])
-        rk=f"{phone}_{plate}"
-        if rk in rems and not rems[rk].get("is_done") and str(rems[rk].get("reminder_date","9999"))<=today_iso:
-            sk="reminder"
-        prows=[r for r in rows if str(r.get("system_status","")).strip()=="معلقة"]
-        tp=sum(float(r.get("amount",0)) for r in prows if r.get("amount"))
-        dpays=[]
-        if not pdf.empty:
-            m=(pdf["driver_name"]==name)&(pdf["plate"]==plate)
-            dpays=pdf[m].to_dict("records")
-        conf_paid=sum(float(p.get("amount_paid",0)) for p in dpays if p.get("verification_status")=="مؤكد")
-        remaining=max(0,tp-conf_paid)
+    for row in records:
+        ph  = cp(row.get("phone")) or "بلا رقم"
+        pl  = str(row.get("plate","")).strip() or "غير محدد"
+        key = (str(row.get("driver_name","")).strip(), ph, pl)
+        groups.setdefault(key, []).append(row)
+
+    result = []
+    for key, rows in groups.items():
+        name, phone, plate = key
+        sk  = get_sk([r.get("status","") for r in rows])
+        rk  = f"{phone}_{plate}"
+        if rk in rems and not rems[rk].get("is_done") and str(rems[rk].get("reminder_date","9999")) <= today_iso:
+            sk = "reminder"
+        prows     = [r for r in rows if str(r.get("system_status","")).strip() == "معلقة"]
+        tp        = sum(float(r.get("amount",0)) for r in prows if r.get("amount"))
+        dpays     = pays_idx.get((name, plate), [])
+        conf_paid = sum(float(p.get("amount_paid",0)) for p in dpays if p.get("verification_status") == "مؤكد")
+        remaining = max(0, tp - conf_paid)
         result.append({
-            "key":key,"name":name,"phone":phone,"plate":plate,
-            "sk":sk,"label":SL.get(sk,sk),
-            "rows":rows,"prows":prows,"count":len(rows),
-            "tp":tp,"conf_paid":conf_paid,"remaining":remaining,
-            "pays":dpays,"rem":rems.get(rk,{}),
+            "key":key, "name":name, "phone":phone, "plate":plate,
+            "sk":sk, "label":SL.get(sk, sk),
+            "rows":rows, "prows":prows, "count":len(rows),
+            "tp":tp, "conf_paid":conf_paid, "remaining":remaining,
+            "pays":dpays, "rem":rems.get(rk, {}),
         })
-    result.sort(key=lambda d:(PR.get(d["sk"],99),d["name"]))
+    result.sort(key=lambda d: (PR.get(d["sk"], 99), d["name"]))
     return result
 
 # ══════════════════════════════════════════════════════════
