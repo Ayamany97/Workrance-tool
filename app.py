@@ -5,6 +5,7 @@ import pandas as pd
 import urllib.parse
 import uuid
 import io
+import httpx as _hx
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 
@@ -123,12 +124,18 @@ div[data-testid="metric-container"] {
 </style>""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════
-# SUPABASE
+# HTTP — direct PostgREST (no supabase-py)
 # ═══════════════════════════════════════════════════════════
-@st.cache_resource
-def get_sb():
-    from supabase import create_client
-    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+def _base(): return st.secrets["SUPABASE_URL"]
+
+def _h(extra=None):
+    k = st.secrets["SUPABASE_KEY"]
+    h = {"apikey": k, "Authorization": f"Bearer {k}", "Content-Type": "application/json"}
+    if extra: h.update(extra)
+    return h
+
+def _rh():  # read headers — allow up to 10000 rows
+    return _h({"Range-Unit": "items", "Range": "0-9999"})
 
 # ═══════════════════════════════════════════════════════════
 # USER SELECT (no login screen)
@@ -143,23 +150,27 @@ def get_user():
 # ═══════════════════════════════════════════════════════════
 @st.cache_data(ttl=30)
 def _viols():
-    r = get_sb().table("violations").select("*").execute()
-    return pd.DataFrame(r.data) if r.data else pd.DataFrame()
+    r = _hx.get(f"{_base()}/rest/v1/violations?select=*", headers=_rh(), timeout=30)
+    d = r.json() if r.status_code == 200 else []
+    return pd.DataFrame(d) if d else pd.DataFrame()
 
 @st.cache_data(ttl=30)
 def _pays():
-    r = get_sb().table("payments").select("*").execute()
-    return pd.DataFrame(r.data) if r.data else pd.DataFrame()
+    r = _hx.get(f"{_base()}/rest/v1/payments?select=*", headers=_rh(), timeout=30)
+    d = r.json() if r.status_code == 200 else []
+    return pd.DataFrame(d) if d else pd.DataFrame()
 
 @st.cache_data(ttl=30)
 def _notifs():
-    r = get_sb().table("notifications").select("*").execute()
-    return pd.DataFrame(r.data) if r.data else pd.DataFrame()
+    r = _hx.get(f"{_base()}/rest/v1/notifications?select=*", headers=_rh(), timeout=30)
+    d = r.json() if r.status_code == 200 else []
+    return pd.DataFrame(d) if d else pd.DataFrame()
 
 @st.cache_data(ttl=30)
 def _rems():
-    r = get_sb().table("reminders").select("*").execute()
-    return {f"{x['phone']}_{x['plate']}": x for x in (r.data or [])}
+    r = _hx.get(f"{_base()}/rest/v1/reminders?select=*", headers=_rh(), timeout=30)
+    d = r.json() if r.status_code == 200 else []
+    return {f"{x['phone']}_{x['plate']}": x for x in (d or [])}
 
 def bust():
     _viols.clear(); _pays.clear(); _notifs.clear(); _rems.clear()
@@ -171,50 +182,58 @@ def upd_status(name, phone, plate, status, notes="", cdate=""):
     d = {"status": status, "updated_at": datetime.now(RIYADH).isoformat()}
     if cdate: d["contact_date"] = cdate
     if notes: d["my_notes"] = notes
-    get_sb().table("violations").update(d)\
-        .eq("driver_name",name).eq("phone",phone).eq("plate",plate).execute()
+    _hx.patch(f"{_base()}/rest/v1/violations",
+              params={"driver_name": f"eq.{name}", "phone": f"eq.{phone}", "plate": f"eq.{plate}"},
+              json=d, headers=_h({"Prefer": "return=minimal"}), timeout=30)
     bust()
 
 def log_notif(name, phone, plate, ntype, sent_by, notes=""):
-    get_sb().table("notifications").insert({
-        "driver_name":name,"phone":phone,"plate":plate,
-        "notification_type":ntype,"sent_by":sent_by,
-        "sent_at":datetime.now(RIYADH).isoformat(),"notes":notes
-    }).execute()
+    _hx.post(f"{_base()}/rest/v1/notifications",
+             json={"driver_name":name,"phone":phone,"plate":plate,
+                   "notification_type":ntype,"sent_by":sent_by,
+                   "sent_at":datetime.now(RIYADH).isoformat(),"notes":notes},
+             headers=_h({"Prefer": "return=minimal"}), timeout=30)
     bust()
 
 def upsert_rem(phone, plate, name, rdate, note, by):
-    get_sb().table("reminders").upsert({
-        "phone":phone,"plate":plate,"driver_name":name,
-        "reminder_date":rdate.isoformat(),"note":note,
-        "created_by":by,"is_done":False
-    }).execute()
+    _hx.post(f"{_base()}/rest/v1/reminders",
+             json={"phone":phone,"plate":plate,"driver_name":name,
+                   "reminder_date":rdate.isoformat(),"note":note,
+                   "created_by":by,"is_done":False},
+             headers=_h({"Prefer": "resolution=merge-duplicates,return=minimal"}), timeout=30)
     bust()
 
 def add_payment(vid, name, phone, plate, amt, ptype, method,
                 receipt_url, receipt_ref, collector, other_col, verif, pdate, notes):
-    get_sb().table("payments").insert({
-        "violation_id":vid,"driver_name":name,"phone":phone,"plate":plate,
-        "amount_paid":amt,"payment_type":ptype,"payment_method":method,
-        "receipt_url":receipt_url,"receipt_ref":receipt_ref,
-        "collected_by":collector,"other_collector":other_col,
-        "verification_status":verif,"payment_date":pdate,"notes":notes
-    }).execute()
+    _hx.post(f"{_base()}/rest/v1/payments",
+             json={"violation_id":vid,"driver_name":name,"phone":phone,"plate":plate,
+                   "amount_paid":amt,"payment_type":ptype,"payment_method":method,
+                   "receipt_url":receipt_url,"receipt_ref":receipt_ref,
+                   "collected_by":collector,"other_collector":other_col,
+                   "verification_status":verif,"payment_date":pdate,"notes":notes},
+             headers=_h({"Prefer": "return=minimal"}), timeout=30)
     bust()
 
 def confirm_pay(pid):
-    get_sb().table("payments").update({"verification_status":"مؤكد"})\
-        .eq("id", pid).execute()
+    _hx.patch(f"{_base()}/rest/v1/payments",
+              params={"id": f"eq.{pid}"},
+              json={"verification_status":"مؤكد"},
+              headers=_h({"Prefer": "return=minimal"}), timeout=30)
     bust()
 
 def upload_receipt(f, pid):
     try:
-        sb  = get_sb()
         ext = f.name.split(".")[-1]
         path = f"receipts/{pid}.{ext}"
-        sb.storage.from_("receipts").upload(
-            path, f.read(), file_options={"content-type":f.type,"upsert":"true"})
-        return sb.storage.from_("receipts").get_public_url(path)
+        r = _hx.post(f"{_base()}/storage/v1/object/{path}",
+                     content=f.read(),
+                     headers={"apikey": st.secrets["SUPABASE_KEY"],
+                              "Authorization": f"Bearer {st.secrets['SUPABASE_KEY']}",
+                              "Content-Type": f.type, "x-upsert": "true"},
+                     timeout=60)
+        if r.status_code in (200, 201):
+            return f"{_base()}/storage/v1/object/public/{path}"
+        return ""
     except Exception as e:
         st.warning(f"تعذّر رفع الإيصال: {e}")
         return ""
@@ -830,7 +849,7 @@ def pg_admin():
                     ex_ids=set(ex["violation_id"].dropna().astype(str)) if not ex.empty else set()
                     ndf_["_v"]=ndf_["رقم المخالفة"].astype(str)
                     to_add=ndf_[~ndf_["_v"].isin(ex_ids)]
-                    added=0; batch=[]; sb=get_sb()
+                    added=0; batch=[]
                     def _ss(v): return str(v).strip() if v and str(v) not in ("nan","None") else ""
                     for _,row in to_add.iterrows():
                         vid=_ss(row.get("رقم المخالفة"))
@@ -854,10 +873,12 @@ def pg_admin():
                             "assigned_to":asgn,"manually_added":False,
                         })
                         if len(batch)>=50:
-                            sb.table("violations").insert(batch).execute()
+                            _hx.post(f"{_base()}/rest/v1/violations", json=batch,
+                                     headers=_h({"Prefer":"return=minimal"}), timeout=60)
                             added+=len(batch); batch=[]
                     if batch:
-                        sb.table("violations").insert(batch).execute()
+                        _hx.post(f"{_base()}/rest/v1/violations", json=batch,
+                                 headers=_h({"Prefer":"return=minimal"}), timeout=60)
                         added+=len(batch)
                     bust()
                     st.success(f"✅ {added} مخالفة جديدة أُضيفت | {len(ex_ids)} موجودة مسبقاً لم تُمس")
@@ -883,14 +904,14 @@ def pg_admin():
             else:
                 vid=f"MAN-{date.today().strftime('%Y')}-{str(uuid.uuid4())[:6].upper()}"
                 try:
-                    get_sb().table("violations").insert({
-                        "violation_id":vid,"driver_name":new_name.strip(),
-                        "phone":cp(new_phone),"plate":new_plate.strip().upper(),
-                        "authority":new_auth,"violation_date":new_date.strftime("%Y-%m-%d"),
-                        "amount":new_amt,"system_status":"معلقة",
-                        "match_status":"مؤكدة","status":"جديد",
-                        "my_notes":new_notes,"manually_added":True,
-                    }).execute()
+                    _hx.post(f"{_base()}/rest/v1/violations",
+                             json={"violation_id":vid,"driver_name":new_name.strip(),
+                                   "phone":cp(new_phone),"plate":new_plate.strip().upper(),
+                                   "authority":new_auth,"violation_date":new_date.strftime("%Y-%m-%d"),
+                                   "amount":new_amt,"system_status":"معلقة",
+                                   "match_status":"مؤكدة","status":"جديد",
+                                   "my_notes":new_notes,"manually_added":True},
+                             headers=_h({"Prefer":"return=minimal"}), timeout=30)
                     bust()
                     st.success(f"✅ تمت الإضافة — رقم المخالفة: {vid}")
                 except Exception as e: st.error(f"خطأ: {e}")
