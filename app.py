@@ -180,21 +180,30 @@ header[data-testid="stHeader"] { background:rgba(10,15,30,0.95)!important; backd
 .stButton > button:active { opacity:.72!important; transform:scale(.97)!important; }
 
 /* ── SIDEBAR ── */
+/* Sidebar section: match app bg exactly so collapsed thin strip is invisible */
 section[data-testid="stSidebar"] {
-    background:linear-gradient(180deg,#0d1626,#0a0f1e)!important;
+    background:#0a0f1e!important;
     border:none!important;
     outline:none!important;
     box-shadow:none!important;
 }
+/* Gradient only on the inner content — visible when open, irrelevant when collapsed */
+section[data-testid="stSidebar"] > div:first-child {
+    background:linear-gradient(180deg,#0d1626,#0a0f1e)!important;
+    min-height:100vh!important;
+}
 section[data-testid="stSidebar"]::before,
 section[data-testid="stSidebar"]::after { display:none!important; }
 
-/* ── HIDE SIDEBAR RESIZE HANDLE (the persistent left-edge line) ── */
+/* ── HIDE SIDEBAR RESIZE HANDLE ── */
 [data-testid="stSidebarResizeHandle"],
-[data-testid="stSidebarResizeHandle"] * { display:none!important; width:0!important; }
-/* fallback: any thin col-resize cursor divs Streamlit injects */
-div[style*="col-resize"] { display:none!important; }
-section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!important; }
+[data-testid="stSidebarResizeHandle"] * { display:none!important; width:0!important; opacity:0!important; }
+/* All cursor variants in inline style */
+div[style*="col-resize"], div[style*="ew-resize"],
+div[style*="cursor: col-resize"], div[style*="cursor: ew-resize"],
+div[style*="cursor:col-resize"], div[style*="cursor:ew-resize"] {
+    display:none!important; width:0!important; opacity:0!important;
+}
 [data-testid="stSidebar"] .stRadio > div { gap:2px!important; }
 [data-testid="stSidebar"] .stRadio label { border-radius:8px!important; padding:10px 14px!important; font-size:14px!important; transition:background .15s!important; }
 [data-testid="stSidebar"] .stRadio label:hover { background:rgba(96,165,250,.1)!important; }
@@ -219,14 +228,8 @@ section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!impo
     background:rgba(96,165,250,.2)!important;
     border-radius:8px!important; border:1px solid #334155!important;
 }
-[data-testid="collapsedControl"] {
-    background:#0d1626!important;
-    border:2px solid #334155!important;
-    box-shadow:-3px 0 10px rgba(0,0,0,.4)!important;
-}
-[data-testid="collapsedControl"] button {
-    color:#93c5fd!important; opacity:1!important; font-size:16px!important;
-}
+/* Hide collapsed control — overlaps stats strip, sidebar opens via toolbar > */
+[data-testid="collapsedControl"] { display:none!important; }
 
 /* ── METRICS (payments/reports page) ── */
 div[data-testid="metric-container"] {
