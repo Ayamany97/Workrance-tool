@@ -477,7 +477,8 @@ def get_sk(statuses):
     if any("لم يتم" in v for v in vals): return "new"
     if any("لا داعي" in v or "لاداعي" in v for v in vals): return "no_contact"
     if any("بلا رقم" in v or "لا يوجد رقم" in v or "لايوجد رقم" in v for v in vals): return "no_phone"
-    if any("واتساب" in v and ("لا" in v or "بلا" in v or "لايوجد" in v) for v in vals): return "no_wa"
+    if any("واتساب" in v and ("لا" in v or "بلا" in v or "لايوجد" in v or "لا يوجد" in v or "بدون" in v or "غير" in v) for v in vals): return "no_wa"
+    if any("بلا واتساب" in v or "لا واتساب" in v or "بدون واتساب" in v for v in vals): return "no_wa"
     return "new"
 
 SL = {
@@ -500,6 +501,8 @@ STAT_CFG = [
     ("pending",  "#f97316", "hourglass", "معلق"),
     ("notified", "#3b82f6", "send",      "تبليغ"),
     ("done",     "#22c55e", "check-c",   "تم"),
+    ("no_phone", "#475569", "phone",     "بلا رقم"),
+    ("no_wa",    "#475569", "msg",       "بلا واتساب"),
 ]
 
 # ══════════════════════════════════════════════════════════
@@ -579,8 +582,8 @@ def build_drivers(vdf, pdf, rems, today_iso):
     for key, rows in groups.items():
         name, phone, plate = key
         sk  = get_sk([r.get("status","") for r in rows])
-        if phone == "بلا رقم" and sk == "new":
-            sk = "pending"
+        if phone == "بلا رقم" and sk in ("new", "pending"):
+            sk = "no_phone"
         rk  = f"{phone}_{plate}"
         if rk in rems and not rems[rk].get("is_done") and str(rems[rk].get("reminder_date","9999")) <= today_iso:
             sk = "reminder"
