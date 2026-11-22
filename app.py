@@ -69,7 +69,8 @@ st.markdown("""<style>
 .stApp { direction:rtl; background:#0a0f1e; }
 .stTextArea textarea, .stTextInput input { direction:rtl; font-family:'Segoe UI',Tahoma,Arial,sans-serif; }
 .stTextArea textarea { line-height:1.85; font-size:14px; }
-.block-container { padding-top:0.8rem!important; }
+.block-container { padding-top:4rem!important; padding-bottom:2rem!important; }
+header[data-testid="stHeader"] { background:rgba(10,15,30,0.95)!important; backdrop-filter:blur(8px); border-bottom:1px solid #1e293b; }
 
 /* ── PAGE HEADER ── */
 .pg-hdr {
