@@ -186,9 +186,7 @@ header[data-testid="stHeader"] { background:rgba(10,15,30,0.95)!important; backd
 section[data-testid="stSidebar"] {
     background:linear-gradient(180deg,#0d1626,#0a0f1e)!important;
     border-right:1px solid #1e293b;
-}
-@media (min-width:768px) {
-    section[data-testid="stSidebar"] { min-width:220px!important; max-width:220px!important; }
+    /* NO min/max-width — let Streamlit control collapse/expand freely */
 }
 section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!important; }
 [data-testid="stSidebar"] .stRadio > div { gap:2px!important; }
@@ -199,18 +197,21 @@ section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!impo
 /* ── SIDEBAR COLLAPSE / CLOSE BUTTON ── */
 [data-testid="stSidebarCollapseButton"] button,
 [data-testid="stSidebarCollapseButton"] button:hover {
-    color:#94a3b8!important; opacity:1!important;
-    background:rgba(148,163,184,.1)!important;
-    border-radius:8px!important; border:1px solid #1e293b!important;
+    color:#f1f5f9!important; opacity:1!important;
+    background:rgba(96,165,250,.2)!important;
+    border-radius:8px!important; border:1px solid #334155!important;
 }
+/* >> open button — make it stand out against the dark app background */
 [data-testid="collapsedControl"] {
-    background:rgba(13,22,38,.95)!important;
-    border:1px solid #1e293b!important;
+    background:#0d1626!important;
+    border:2px solid #334155!important;
+    border-left:none!important;
     border-radius:0 10px 10px 0!important;
-    padding:4px!important;
+    padding:6px 4px!important;
+    box-shadow:3px 0 10px rgba(0,0,0,.4)!important;
 }
 [data-testid="collapsedControl"] button {
-    color:#94a3b8!important; opacity:1!important;
+    color:#93c5fd!important; opacity:1!important; font-size:16px!important;
 }
 
 /* ── METRICS (payments/reports page) ── */
