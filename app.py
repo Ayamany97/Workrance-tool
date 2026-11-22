@@ -179,11 +179,33 @@ header[data-testid="stHeader"] { background:rgba(10,15,30,0.95)!important; backd
 .stButton > button:active { opacity:.72!important; transform:scale(.97)!important; }
 
 /* ── SIDEBAR ── */
-section[data-testid="stSidebar"] { background:linear-gradient(180deg,#0d1626,#0a0f1e)!important; border-left:1px solid #1e293b; }
+section[data-testid="stSidebar"] {
+    background:linear-gradient(180deg,#0d1626,#0a0f1e)!important;
+    border-left:1px solid #1e293b;
+    min-width:220px!important; max-width:220px!important;
+}
+section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!important; }
 [data-testid="stSidebar"] .stRadio > div { gap:2px!important; }
 [data-testid="stSidebar"] .stRadio label { border-radius:8px!important; padding:10px 14px!important; font-size:14px!important; transition:background .15s!important; }
 [data-testid="stSidebar"] .stRadio label:hover { background:rgba(96,165,250,.1)!important; }
 [data-testid="stSidebar"] .stCheckbox label { font-size:13px!important; }
+
+/* ── SIDEBAR COLLAPSE / CLOSE BUTTON ── */
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stSidebarCollapseButton"] button:hover {
+    color:#94a3b8!important; opacity:1!important;
+    background:rgba(148,163,184,.1)!important;
+    border-radius:8px!important; border:1px solid #1e293b!important;
+}
+[data-testid="collapsedControl"] {
+    background:rgba(13,22,38,.95)!important;
+    border:1px solid #1e293b!important;
+    border-radius:0 10px 10px 0!important;
+    padding:4px!important;
+}
+[data-testid="collapsedControl"] button {
+    color:#94a3b8!important; opacity:1!important;
+}
 
 /* ── METRICS (payments/reports page) ── */
 div[data-testid="metric-container"] {
@@ -200,21 +222,25 @@ div[data-testid="stMetricValue"] { font-size:26px!important;font-weight:800!impo
 }
 /* ── RESPONSIVE MOBILE ≤768px ── */
 @media screen and (max-width:768px) {
+    /* columns that are NOT viol-action keep stacking; viol-action stays row */
     [data-testid="stHorizontalBlock"] { flex-direction:column!important; gap:.4rem!important; }
     [data-testid="stColumn"] { width:100%!important; min-width:100%!important; flex:unset!important; }
+    .viol-act-row [data-testid="stHorizontalBlock"] { flex-direction:row!important; gap:4px!important; }
+    .viol-act-row [data-testid="stColumn"]:first-child { flex:1!important; width:auto!important; min-width:0!important; }
+    .viol-act-row [data-testid="stColumn"]:not(:first-child) { width:44px!important; min-width:44px!important; flex:unset!important; }
     input,textarea,select { font-size:16px!important; -webkit-text-size-adjust:100%; }
     .stButton > button { min-height:52px!important; font-size:16px!important; border-radius:12px!important; }
     .drv-card { padding:14px!important; }
     .dc-name { font-size:15px!important; }
     .stat-num { font-size:22px!important; }
-    .block-container { padding:.5rem!important; padding-top:.5rem!important; }
+    .block-container { padding:.5rem!important; padding-top:3.5rem!important; }
     button[data-baseweb="tab"] { font-size:12px!important; padding:.45rem .5rem!important; }
     section[data-testid="stSidebar"] { min-width:min(88vw,300px)!important; }
     hr { margin:.5rem 0!important; }
     .pg-hdr { font-size:18px!important; }
 }
 @media screen and (max-width:480px) {
-    .block-container { padding:.35rem!important; }
+    .block-container { padding:.35rem!important; padding-top:3rem!important; }
     .stat-card { min-width:60px; padding:10px 6px 8px; }
 }
 
@@ -239,27 +265,35 @@ def _rh():
 # ══════════════════════════════════════════════════════════
 @st.cache_data(ttl=60)
 def _viols():
-    r = _hx.get(f"{_base()}/rest/v1/violations?select=*", headers=_rh(), timeout=30)
-    d = r.json() if r.status_code==200 else []
-    return pd.DataFrame(d) if d else pd.DataFrame()
+    try:
+        r = _hx.get(f"{_base()}/rest/v1/violations?select=*", headers=_rh(), timeout=30)
+        d = r.json() if r.status_code==200 else []
+        return pd.DataFrame(d) if d else pd.DataFrame()
+    except Exception: return pd.DataFrame()
 
 @st.cache_data(ttl=60)
 def _pays():
-    r = _hx.get(f"{_base()}/rest/v1/payments?select=*", headers=_rh(), timeout=30)
-    d = r.json() if r.status_code==200 else []
-    return pd.DataFrame(d) if d else pd.DataFrame()
+    try:
+        r = _hx.get(f"{_base()}/rest/v1/payments?select=*", headers=_rh(), timeout=30)
+        d = r.json() if r.status_code==200 else []
+        return pd.DataFrame(d) if d else pd.DataFrame()
+    except Exception: return pd.DataFrame()
 
 @st.cache_data(ttl=60)
 def _notifs():
-    r = _hx.get(f"{_base()}/rest/v1/notifications?select=*", headers=_rh(), timeout=30)
-    d = r.json() if r.status_code==200 else []
-    return pd.DataFrame(d) if d else pd.DataFrame()
+    try:
+        r = _hx.get(f"{_base()}/rest/v1/notifications?select=*", headers=_rh(), timeout=30)
+        d = r.json() if r.status_code==200 else []
+        return pd.DataFrame(d) if d else pd.DataFrame()
+    except Exception: return pd.DataFrame()
 
 @st.cache_data(ttl=60)
 def _rems():
-    r = _hx.get(f"{_base()}/rest/v1/reminders?select=*", headers=_rh(), timeout=30)
-    d = r.json() if r.status_code==200 else []
-    return {f"{x['phone']}_{x['plate']}":x for x in (d or [])}
+    try:
+        r = _hx.get(f"{_base()}/rest/v1/reminders?select=*", headers=_rh(), timeout=30)
+        d = r.json() if r.status_code==200 else []
+        return {f"{x['phone']}_{x['plate']}":x for x in (d or [])}
+    except Exception: return {}
 
 def bust():
     _viols.clear(); _pays.clear(); _notifs.clear(); _rems.clear()
@@ -306,6 +340,12 @@ def upd_violation(vid, status, notes=""):
     _hx.patch(f"{_base()}/rest/v1/violations",
               params={"violation_id":f"eq.{vid}"},
               json=d, headers=_h({"Prefer":"return=minimal"}), timeout=30)
+    bust()
+
+def del_violation(vid):
+    _hx.delete(f"{_base()}/rest/v1/violations",
+               params={"violation_id":f"eq.{vid}"},
+               headers=_h({"Prefer":"return=minimal"}), timeout=30)
     bust()
 
 def add_payment(vid, name, phone, plate, amt, ptype, method,
@@ -526,6 +566,8 @@ def build_drivers(vdf, pdf, rems, today_iso):
     for key, rows in groups.items():
         name, phone, plate = key
         sk  = get_sk([r.get("status","") for r in rows])
+        if phone == "بلا رقم" and sk == "new":
+            sk = "pending"
         rk  = f"{phone}_{plate}"
         if rk in rems and not rems[rk].get("is_done") and str(rems[rk].get("reminder_date","9999")) <= today_iso:
             sk = "reminder"
@@ -565,10 +607,7 @@ def pg_drivers(user):
 
     # sidebar filters
     with st.sidebar:
-        sc1, sc2 = st.columns(2)
-        with sc1: st.markdown("**الفلتر:**")
-        with sc2:
-            show_all = st.toggle("الكل", value=False)
+        show_all = st.toggle("عرض الكل", value=False)
         if show_all:
             fn=fr=fc=fp=fpa=fnt=fd=True
         else:
@@ -580,33 +619,28 @@ def pg_drivers(user):
             fnt = st.checkbox("🔵 تم التبليغ", value=False)
             fd  = st.checkbox("🟢 تم",          value=False)
         st.divider()
-        srch=st.text_input("بحث",placeholder="اسم أو لوحة...")
-        st.divider()
-        if st.button("تحديث",use_container_width=True):
-            bust(); st.rerun()
-
-        # ── upcoming reminders ──
-        upcoming = sorted(
-            [(k,v) for k,v in rems.items()
-             if not v.get("is_done") and str(v.get("reminder_date","9999")) >= today_iso],
-            key=lambda x: x[1].get("reminder_date","")
-        )
-        if upcoming:
-            st.divider()
-            with st.expander(f"التذكيرات القادمة ({len(upcoming)})"):
-                for _, r in upcoming[:8]:
-                    rdate = r.get("reminder_date","")
-                    is_today = rdate == today_iso
-                    color = "#f97316" if is_today else "#64748b"
-                    dot   = "🔔" if is_today else "·"
-                    st.markdown(
-                        f"<div style='padding:5px 0;border-bottom:1px solid #1e293b;font-size:12px'>"
-                        f"<span style='color:{color}'>{dot}</span> "
-                        f"<b style='color:#e2e8f0'>{r.get('driver_name','')}</b> "
-                        f"<span style='color:#475569'>{rdate}</span>"
-                        + (f"<br><span style='color:#475569;padding-right:14px'>{r.get('note','')}</span>" if r.get("note") else "")
-                        + "</div>",
-                        unsafe_allow_html=True)
+        srch=st.text_input("",placeholder="بحث: اسم أو لوحة...",label_visibility="collapsed")
+        sc1, sc2 = st.columns([1,1])
+        with sc1:
+            if st.button("تحديث",use_container_width=True):
+                bust(); st.rerun()
+        with sc2:
+            no_ph_drvs = [d for d in drivers if d["phone"] == "بلا رقم"]
+            if no_ph_drvs:
+                _rows_nph = []
+                for _d in no_ph_drvs:
+                    for _v in _d["rows"]:
+                        _rows_nph.append({"السائق":_d["name"],"اللوحة":_d["plate"],
+                            "رقم المخالفة":_v.get("violation_id",""),
+                            "الجهة":_v.get("authority",""),
+                            "التاريخ":fdt(_v.get("violation_date","")),
+                            "المبلغ":_v.get("amount",""),"الحالة":_v.get("status","")})
+                _buf = io.BytesIO()
+                pd.DataFrame(_rows_nph).to_excel(_buf, index=False, engine="openpyxl")
+                st.download_button(f"بلا رقم",data=_buf.getvalue(),
+                    file_name="drivers_no_phone.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True, key="exp_noph")
 
     fm={"new":fn,"reminder":fr,"check":fc,"pending":fp,"partial":fpa,"notified":fnt,"done":fd}
     shown=[d for d in drivers
@@ -637,10 +671,11 @@ def pg_drivers(user):
         )
     st.markdown(f'<div class="stat-strip">{cards_html}</div>', unsafe_allow_html=True)
 
-    left, right = st.columns([1, 1.7])
+    sel_key = st.session_state.get("sel")
+    sel = next((d for d in drivers if d["key"]==sel_key), None) if sel_key else None
 
-    # ── driver list ──
-    with left:
+    if not sel:
+        # ── driver list ──
         pg_lbl = f"صفحة {cur_page+1}/{total_pgs}" if total_pgs>1 else ""
         st.markdown(
             f"<div style='font-size:12px;color:#64748b;margin-bottom:6px;display:flex;justify-content:space-between'>"
@@ -683,18 +718,8 @@ def pg_drivers(user):
                 if cur_page<total_pgs-1 and st.button("التالي ←",use_container_width=True,key="pg_next"):
                     st.session_state.drv_page=cur_page+1; st.rerun()
 
-    # ── driver detail ──
-    with right:
-        sk  = st.session_state.get("sel")
-        sel = next((d for d in drivers if d["key"]==sk), None) if sk else None
-        if not sel:
-            st.markdown(
-                f'<div style="text-align:center;padding:60px 20px;color:#334155">'
-                f'{ico("chevron",48,"#1e293b")}'
-                f'<div style="margin-top:12px;font-size:14px">اختر سائقاً من القائمة</div>'
-                f'</div>',
-                unsafe_allow_html=True)
-            return
+    else:
+        sk = sel_key
 
         # ── detail header card ──
         status_badge = f'<span class="dc-badge b-{sel["sk"]}" style="font-size:12px;padding:4px 12px">{sel["label"]}</span>'
@@ -754,18 +779,77 @@ def pg_drivers(user):
             icon_html = (f'{ico("check-c",15,"#22c55e")}' if paid
                          else f'{ico("x-c",15,"#ef4444")}')
             paid_lbl = " — مدفوعة" if paid and vid in dpays_vids else ""
-            st.markdown(
-                f'<div class="viol-row {"viol-paid" if paid else "viol-unpaid"}">'
-                f'  <span class="viol-icon">{icon_html}</span>'
-                f'  <span class="viol-body">'
-                f'    <b>{jlbl(v.get("authority"))}</b>'
-                f'    <span style="color:#475569"> · {fdt(v.get("violation_date"))} · </span>'
-                f'    <b>{famt(v.get("amount"))} ريال</b>'
-                f'    <span style="color:#22c55e;font-size:11px">{paid_lbl}</span>'
-                f'    <br><small style="color:#334155">{ss} &nbsp; {vid}</small>'
-                f'  </span>'
-                f'</div>',
-                unsafe_allow_html=True)
+            st.markdown('<div class="viol-act-row">', unsafe_allow_html=True)
+            vc1, vc2, vc3 = st.columns([10, 1, 1])
+            with vc1:
+                st.markdown(
+                    f'<div class="viol-row {"viol-paid" if paid else "viol-unpaid"}">'
+                    f'  <span class="viol-icon">{icon_html}</span>'
+                    f'  <span class="viol-body">'
+                    f'    <b>{jlbl(v.get("authority"))}</b>'
+                    f'    <span style="color:#475569"> · {fdt(v.get("violation_date"))} · </span>'
+                    f'    <b>{famt(v.get("amount"))} ريال</b>'
+                    f'    <span style="color:#22c55e;font-size:11px">{paid_lbl}</span>'
+                    f'    <br><small style="color:#334155">{ss} &nbsp; {vid}</small>'
+                    f'  </span>'
+                    f'</div>',
+                    unsafe_allow_html=True)
+            with vc2:
+                if st.button("✏️", key=f"ev_{vid}", use_container_width=True, help="تعديل"):
+                    if st.session_state.get("edit_v") == vid:
+                        st.session_state.pop("edit_v", None)
+                    else:
+                        st.session_state["edit_v"] = vid
+                        st.session_state.pop("del_confirm", None)
+                    st.rerun()
+            with vc3:
+                if st.button("🗑️", key=f"dv_{vid}", use_container_width=True, help="حذف"):
+                    if st.session_state.get("del_confirm") == vid:
+                        st.session_state.pop("del_confirm", None)
+                    else:
+                        st.session_state["del_confirm"] = vid
+                        st.session_state.pop("edit_v", None)
+                        st.toast("⚠ اضغط تأكيد لإتمام الحذف")
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # ── edit form ──
+            if st.session_state.get("edit_v") == vid:
+                ef1, ef2 = st.columns([2, 1])
+                with ef1:
+                    e_st = st.selectbox("الحالة:", ["تم التبليغ","معلق","تم الدفع","مدفوع جزئي",
+                                                    "بلا واتساب","بلا رقم","لا داعي للتواصل","لم يتم التواصل"],
+                                        key=f"est_{vid}")
+                cur_notes = str(v.get("my_notes","")).strip()
+                cur_notes = "" if cur_notes in ("nan","None") else cur_notes
+                e_notes = st.text_area("ملاحظة:", value=cur_notes, key=f"en_{vid}",
+                                       placeholder="اختياري...", height=68)
+                es1, es2 = st.columns(2)
+                with es1:
+                    if st.button("حفظ", type="primary", key=f"esv_{vid}", use_container_width=True):
+                        upd_violation(vid, e_st, e_notes)
+                        st.toast("✓ تم تحديث المخالفة")
+                        st.session_state.pop("edit_v", None)
+                        st.rerun()
+                with es2:
+                    if st.button("إلغاء", key=f"esc_{vid}", use_container_width=True):
+                        st.session_state.pop("edit_v", None)
+                        st.rerun()
+
+            # ── delete confirmation ──
+            if st.session_state.get("del_confirm") == vid:
+                st.warning(f"حذف: **{jlbl(v.get('authority'))}** · {fdt(v.get('violation_date'))} · {famt(v.get('amount'))} ريال")
+                dc1, dc2 = st.columns(2)
+                with dc1:
+                    if st.button("تأكيد الحذف", type="primary", key=f"dok_{vid}", use_container_width=True):
+                        del_violation(vid)
+                        st.toast("✓ تم حذف المخالفة")
+                        st.session_state.pop("del_confirm", None)
+                        st.rerun()
+                with dc2:
+                    if st.button("إلغاء", key=f"dcan_{vid}", use_container_width=True):
+                        st.session_state.pop("del_confirm", None)
+                        st.rerun()
 
         if sel["remaining"]>0:
             st.markdown(
@@ -796,24 +880,14 @@ def pg_drivers(user):
         notif_msg  = gen_notif(sel["name"],sel["plate"],pviols,user,conf_pays or None)
         remind_msg = gen_reminder(sel["name"],sel["plate"],pviols,user,conf_pays or None)
 
-        msg_tab, rem_tab = st.tabs(["رسالة التبليغ","رسالة التذكير"])
-        with msg_tab:
-            edited_notif = st.text_area("",value=notif_msg,height=240,
-                                        key=f"mn_{sk}_{user}",label_visibility="collapsed")
-        with rem_tab:
-            edited_rem = st.text_area("",value=remind_msg,height=240,
-                                      key=f"mr_{sk}_{user}",label_visibility="collapsed")
+        st.markdown(f"<div style='font-size:12px;color:#64748b;margin-bottom:4px'>{ico('msg',13,'#64748b')} رسالة التبليغ</div>", unsafe_allow_html=True)
+        edited_notif = st.text_area("",value=notif_msg,height=200,
+                                    key=f"mn_{sk}_{user}",label_visibility="collapsed")
 
         # ── action buttons ──
-        b1, b2 = st.columns(2)
-        with b1:
-            url = wa_link(sel["phone"],edited_notif) if sel["phone"]!="بلا رقم" else None
-            if url: wa_btn(url,"تبليغ واتساب","#25D366")
-            else:   st.button("لا يوجد رقم",disabled=True,use_container_width=True)
-        with b2:
-            rurl = wa_link(sel["phone"],edited_rem) if sel["phone"]!="بلا رقم" else None
-            if rurl: wa_btn(rurl,"تذكير واتساب","#3b82f6")
-            else:    st.button("لا يوجد رقم",disabled=True,use_container_width=True)
+        url = wa_link(sel["phone"],edited_notif) if sel["phone"]!="بلا رقم" else None
+        if url: wa_btn(url,"تبليغ واتساب","#25D366")
+        else:   st.button("لا يوجد رقم",disabled=True,use_container_width=True)
 
         b3, b4, b5 = st.columns(3)
         with b3:
@@ -838,9 +912,9 @@ def pg_drivers(user):
             st.markdown(f"<div style='font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:8px'>{ico('board',16,'#60a5fa')} تسجيل الإرسال</div>",
                         unsafe_allow_html=True)
             new_st=st.selectbox("الحالة:",["تم التبليغ","معلق","بلا واتساب","بلا رقم","لا داعي للتواصل","تم الدفع"],key=f"nst_{sk}")
-            rc1,rc2=st.columns(2)
-            with rc1: rd=st.date_input("تذكير:",value=today+timedelta(days=3),key=f"rd_{sk}")
             nv=st.text_area("ملاحظة:",key=f"nv_{sk}",placeholder="وعد بالدفع / لا يرد / ...")
+            rd = today + timedelta(days=3)
+            st.caption(f"سيُضاف تذكير تلقائياً في {rd.strftime('%d-%m-%Y')}")
             sc1,sc2=st.columns(2)
             with sc1:
                 if st.button("حفظ",type="primary",key=f"ssv_{sk}",use_container_width=True):
@@ -1195,35 +1269,199 @@ def pg_admin():
                 type="primary")
 
 # ══════════════════════════════════════════════════════════
+# PAGE: التذكيرات
+# ══════════════════════════════════════════════════════════
+def pg_reminders(user):
+    vdf=_viols(); pdf=_pays(); ndf=_notifs(); rems=_rems()
+    today=date.today(); today_iso=today.isoformat()
+
+    st.markdown(f'<div class="pg-hdr">{ico("bell",22,"#f97316")} التذكيرات</div>', unsafe_allow_html=True)
+
+    if vdf.empty:
+        st.warning("لا توجد بيانات."); return
+
+    all_drvs = build_drivers(vdf, pdf, rems, today_iso)
+
+    # drivers with pending reminders (due today or overdue)
+    due = [d for d in all_drvs
+           if d.get("rem",{}).get("reminder_date")
+           and not d["rem"].get("is_done")
+           and str(d["rem"]["reminder_date"]) <= today_iso]
+
+    if not due:
+        st.success("لا يوجد تذكيرات مستحقة اليوم.")
+        upcoming = sorted(
+            [d for d in all_drvs if d.get("rem",{}).get("reminder_date") and not d["rem"].get("is_done")
+             and str(d["rem"]["reminder_date"]) > today_iso],
+            key=lambda d: d["rem"]["reminder_date"])
+        if upcoming:
+            st.divider()
+            st.markdown(f"<div style='font-size:12px;color:#64748b;margin-bottom:8px'>{ico('clock',13,'#64748b')} التذكيرات القادمة ({len(upcoming)})</div>", unsafe_allow_html=True)
+            for d in upcoming[:15]:
+                rdate = d["rem"]["reminder_date"]
+                note  = d["rem"].get("note","")
+                st.markdown(
+                    f"<div style='padding:6px 0;border-bottom:1px solid #1e293b;font-size:13px'>"
+                    f"<b style='color:#e2e8f0'>{d['name']}</b> "
+                    f"<span style='color:#475569'>{d['plate']} · {rdate}</span>"
+                    + (f"<br><span style='color:#475569;font-size:11px;padding-right:12px'>{note}</span>" if note else "")
+                    + "</div>", unsafe_allow_html=True)
+        return
+
+    overdue = [d for d in due if str(d["rem"]["reminder_date"]) < today_iso]
+    today_r = [d for d in due if str(d["rem"]["reminder_date"]) == today_iso]
+    st.markdown(
+        f'<div class="stat-strip">'
+        f'<div class="stat-card"><div class="stat-num" style="color:#ef4444">{len(overdue)}</div>'
+        f'<div class="stat-lbl">{ico("alert",12,"#ef4444")}<span>متأخر</span></div></div>'
+        f'<div class="stat-card"><div class="stat-num" style="color:#f97316">{len(today_r)}</div>'
+        f'<div class="stat-lbl">{ico("bell",12,"#f97316")}<span>اليوم</span></div></div>'
+        f'<div class="stat-card"><div class="stat-num" style="color:#94a3b8">{len(due)}</div>'
+        f'<div class="stat-lbl">{ico("users",12,"#94a3b8")}<span>الإجمالي</span></div></div>'
+        f'</div>', unsafe_allow_html=True)
+
+    sel_key = st.session_state.get("rem_sel")
+    rsel = next((d for d in due if d["key"]==sel_key), None) if sel_key else None
+
+    if not rsel:
+        st.markdown(f"<div style='font-size:12px;color:#64748b;margin-bottom:6px'>{ico('bell',13,'#64748b')} {len(due)} تذكير مستحق</div>", unsafe_allow_html=True)
+        for i, d in enumerate(due):
+            rdate = d["rem"].get("reminder_date","")
+            is_ov = str(rdate) < today_iso
+            bc    = "#ef4444" if is_ov else "#f97316"
+            lbl   = "متأخر" if is_ov else "اليوم"
+            bcls  = "b-new" if is_ov else "b-reminder"
+            note  = d["rem"].get("note","")
+            st.markdown(
+                f'<div class="drv-card" style="border-right-color:{bc}">'
+                f'  <div class="dc-info">'
+                f'    <span class="dc-name">{d["name"]}</span>'
+                f'    <span class="dc-sub">{ico("car",12,"#475569")} {d["plate"]}'
+                f'      <span style="color:#334155">·</span> {ico("clock",12,"#475569")} {rdate}</span>'
+                + (f'    <span style="font-size:11px;color:#475569;margin-top:2px;display:block">{note}</span>' if note else "")
+                + f'  </div>'
+                f'  <div class="dc-side">'
+                f'    <span class="dc-badge {bcls}">{lbl}</span>'
+                f'    <span class="dc-amt">{famt(d["remaining"] or d["tp"])} ر</span>'
+                f'  </div>'
+                f'</div>', unsafe_allow_html=True)
+            st.markdown('<div class="drv-open">', unsafe_allow_html=True)
+            if st.button("تذكير", key=f"ropen_{i}", use_container_width=True):
+                st.session_state["rem_sel"] = d["key"]; st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    else:
+        rdate   = rsel["rem"].get("reminder_date","")
+        is_ov   = str(rdate) < today_iso
+        pviols  = rsel["prows"] if rsel["prows"] else rsel["rows"]
+        dpv     = {p.get("violation_id") for p in rsel["pays"]}
+        conf_p  = [p for p in rsel["pays"] if p.get("verification_status")=="مؤكد"]
+
+        bc1, bc2 = st.columns([1, 5])
+        with bc1:
+            if st.button("رجوع", key="rem_back", use_container_width=True):
+                st.session_state["rem_sel"] = None; st.rerun()
+
+        status_badge = f'<span class="dc-badge {"b-new" if is_ov else "b-reminder"}" style="font-size:12px;padding:4px 12px">{"متأخر" if is_ov else "اليوم"}</span>'
+        st.markdown(
+            f'<div class="drv-hdr">'
+            f'  <div>'
+            f'    <span class="dh-name">{rsel["name"]}</span>'
+            f'    <div class="dh-meta">'
+            f'      <span class="dh-pill">{ico("car",14,"#60a5fa")} {rsel["plate"]}</span>'
+            f'      <span class="dh-pill">{ico("phone",14,"#60a5fa")} {rsel["phone"]}</span>'
+            f'      <span class="dh-pill">{ico("clock",14,"#f97316")} تذكير {rdate}</span>'
+            f'    </div>'
+            + (f'    <div style="margin-top:5px;font-size:12px;color:#64748b">{rsel["rem"].get("note","")}</div>' if rsel["rem"].get("note") else "")
+            + f'  </div>  {status_badge}'
+            f'</div>', unsafe_allow_html=True)
+
+        for v in pviols:
+            paid = v.get("violation_id","") in dpv
+            ih   = f'{ico("check-c",14,"#22c55e")}' if paid else f'{ico("x-c",14,"#ef4444")}'
+            st.markdown(
+                f'<div class="viol-row {"viol-paid" if paid else "viol-unpaid"}">'
+                f'  <span class="viol-icon">{ih}</span>'
+                f'  <span class="viol-body"><b>{jlbl(v.get("authority"))}</b>'
+                f'  <span style="color:#475569"> · {fdt(v.get("violation_date"))} · </span>'
+                f'  <b>{famt(v.get("amount"))} ريال</b></span></div>', unsafe_allow_html=True)
+
+        if rsel["remaining"]>0:
+            st.markdown(f'<div style="margin-top:6px;padding:8px 12px;background:rgba(239,68,68,.1);border-radius:8px;border-right:3px solid #ef4444;font-size:13px;color:#fca5a5">{ico("dollar",13,"#ef4444")} المتبقي: <b>{famt(rsel["remaining"])} ريال</b></div>', unsafe_allow_html=True)
+
+        st.divider()
+
+        remind_msg = gen_reminder(rsel["name"], rsel["plate"], pviols, user, conf_p or None)
+        st.markdown(f"<div style='font-size:12px;color:#64748b;margin-bottom:4px'>{ico('msg',13,'#64748b')} رسالة التذكير</div>", unsafe_allow_html=True)
+        edited_rem = st.text_area("", value=remind_msg, height=210,
+                                  key=f"rm_{sel_key}_{user}", label_visibility="collapsed")
+
+        rurl = wa_link(rsel["phone"], edited_rem) if rsel["phone"] != "بلا رقم" else None
+        if rurl: wa_btn(rurl, "إرسال التذكير واتساب", "#f97316")
+        else:    st.button("لا يوجد رقم", disabled=True, use_container_width=True)
+
+        st.divider()
+        ra1, ra2 = st.columns(2)
+        with ra1:
+            if st.button("تم التذكير ✓", type="primary", key="rem_done", use_container_width=True):
+                mark_rem_done(rsel["phone"], rsel["plate"])
+                log_notif(rsel["name"], rsel["phone"], rsel["plate"], "تذكير", user)
+                st.toast(f"✓ تم — {rsel['name']}")
+                st.session_state["rem_sel"] = None; st.rerun()
+        with ra2:
+            if st.button("تأجيل 3 أيام", key="rem_post", use_container_width=True):
+                new_rd = today + timedelta(days=3)
+                upsert_rem(rsel["phone"], rsel["plate"], rsel["name"], new_rd, rsel["rem"].get("note",""), user)
+                st.toast(f"تم التأجيل إلى {new_rd.strftime('%d-%m-%Y')}")
+                st.session_state["rem_sel"] = None; st.rerun()
+
+
+# ══════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════
 def main():
-    for k,v in [("user","أحمد"),("sel",None),("sf",False),("pf",False),("sysv",False)]:
+    for k,v in [("user","أحمد"),("sel",None),("rem_sel",None),("sf",False),("pf",False),("sysv",False)]:
         if k not in st.session_state: st.session_state[k]=v
 
     with st.sidebar:
         st.markdown(
-            f'<div style="display:flex;align-items:center;gap:10px;padding:4px 0 12px">'
-            f'{ico("truck",26,"#60a5fa")}'
-            f'<span style="font-size:20px;font-weight:800;color:#f1f5f9">Workrance</span>'
+            f'<div style="display:flex;align-items:center;gap:10px;padding:4px 0 10px">'
+            f'{ico("truck",22,"#60a5fa")}'
+            f'<span style="font-size:18px;font-weight:800;color:#f1f5f9">Workrance</span>'
             f'</div>',
             unsafe_allow_html=True)
         st.divider()
-        chosen=st.radio("أنت؟",["أحمد","رهف"],
-                        index=0 if st.session_state["user"]=="أحمد" else 1,
-                        horizontal=True)
-        if chosen != st.session_state["user"]:
-            st.session_state["user"]=chosen
-            st.session_state.sel=None
+        # user picker — vertical
+        u_chosen = st.radio("", ["أحمد", "رهف"],
+                            index=0 if st.session_state["user"]=="أحمد" else 1,
+                            label_visibility="collapsed")
+        if u_chosen != st.session_state["user"]:
+            st.session_state["user"]=u_chosen
+            st.session_state.sel=st.session_state["rem_sel"]=None
             st.session_state.sf=st.session_state.pf=st.session_state.sysv=False
             st.rerun()
         user=st.session_state["user"]
         st.divider()
-        page=st.radio("",[
-            "السائقون","المدفوعات","التقارير","الإدارة"
-        ],label_visibility="collapsed")
+        page=st.radio("", [
+            "السائقون", "التذكيرات", "المدفوعات", "التقارير", "الإدارة"
+        ], label_visibility="collapsed")
+
+        # reminder alert badge
+        _rems_now = _rems()
+        _today_m  = date.today().isoformat()
+        _due_now  = [v for v in _rems_now.values()
+                     if not v.get("is_done") and str(v.get("reminder_date","9999")) <= _today_m]
+        if _due_now:
+            st.markdown(
+                f'<div style="background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.3);'
+                f'border-radius:10px;padding:9px 12px;margin-top:6px;font-size:13px;color:#fb923c">'
+                f'{ico("bell",14,"#f97316")} <b>{len(_due_now)}</b> تذكير مستحق اليوم</div>',
+                unsafe_allow_html=True)
+
+    st.markdown("<div style='position:fixed;bottom:8px;left:8px;font-size:10px;color:#334155;z-index:9999'>v2.1</div>", unsafe_allow_html=True)
 
     if   page=="السائقون":  pg_drivers(user)
+    elif page=="التذكيرات": pg_reminders(user)
     elif page=="المدفوعات": pg_payments()
     elif page=="التقارير":  pg_reports()
     elif page=="الإدارة":   pg_admin()
