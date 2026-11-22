@@ -182,8 +182,12 @@ header[data-testid="stHeader"] { background:rgba(10,15,30,0.95)!important; backd
 /* ── SIDEBAR ── */
 section[data-testid="stSidebar"] {
     background:linear-gradient(180deg,#0d1626,#0a0f1e)!important;
-    border-left:1px solid #1e293b;
+    border:none!important;
+    outline:none!important;
+    box-shadow:none!important;
 }
+section[data-testid="stSidebar"]::before,
+section[data-testid="stSidebar"]::after { display:none!important; }
 section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!important; }
 [data-testid="stSidebar"] .stRadio > div { gap:2px!important; }
 [data-testid="stSidebar"] .stRadio label { border-radius:8px!important; padding:10px 14px!important; font-size:14px!important; transition:background .15s!important; }
