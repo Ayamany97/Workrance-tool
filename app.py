@@ -19,106 +19,103 @@ st.set_page_config(page_title="Workrance", page_icon="🚛", layout="wide",
 # ═══════════════════════════════════════════════════════════
 st.markdown("""<style>
 
-/* ── BASE ── */
-.stApp { direction: rtl; }
-.stTextArea textarea, .stTextInput input {
-    direction: rtl; font-family: 'Segoe UI', Arial, sans-serif;
-}
-.stTextArea textarea { line-height: 1.9; font-size: 15px; }
-.block-container { padding-top: 1rem !important; }
+/* DESIGN SYSTEM */
+.stApp { direction: rtl; background: #0a0f1e; }
+.stTextArea textarea, .stTextInput input { direction: rtl; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; }
+.stTextArea textarea { line-height: 1.85; font-size: 14px; }
+.block-container { padding-top: 0.8rem !important; }
 
-/* ── COMPONENTS ── */
+/* METRICS */
 div[data-testid="metric-container"] {
-    background: #111827; border: 1px solid #1f2937;
-    border-radius: 10px; padding: 10px 14px;
+    background: linear-gradient(145deg,#1a2744,#111827);
+    border: 1px solid #1e3a5f; border-radius: 14px; padding: 14px 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.4);
 }
+div[data-testid="stMetricLabel"] { font-size:11px!important;color:#64748b!important;text-transform:uppercase;letter-spacing:.8px;font-weight:600; }
+div[data-testid="stMetricValue"] { font-size:28px!important;font-weight:800!important;color:#f1f5f9!important; }
+
+/* DRIVER CARDS */
 .drv-card {
-    background: #111827; border-radius: 10px;
-    padding: 12px 16px; margin: 5px 0;
-    border-right: 4px solid #374151;
+    background: #111827; border-radius: 14px; padding: 14px 16px; margin: 5px 0;
+    border-right: 5px solid #1e293b; display: flex; justify-content: space-between;
+    align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.3);
+    transition: background .2s;
 }
-.drv-new{border-right-color:#ef4444} .drv-reminder{border-right-color:#f97316}
-.drv-check{border-right-color:#eab308} .drv-pending{border-right-color:#f97316}
-.drv-partial{border-right-color:#a855f7} .drv-notified{border-right-color:#3b82f6}
-.drv-done{border-right-color:#22c55e}
+.drv-card:hover { background: #1a2744; }
+.drv-sel { background: #1a2744!important; border-right-width: 6px!important; }
+.dc-info { flex:1; min-width:0; }
+.dc-name { font-size:15px; font-weight:700; color:#f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
+.dc-sub  { font-size:12px; color:#475569; margin-top:4px; display:block; }
+.dc-side { text-align:left; flex-shrink:0; }
+.dc-badge { display:inline-block; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap; }
+.dc-amt  { font-size:12px; color:#64748b; margin-top:5px; display:block; font-weight:600; text-align:left; }
 
-/* ── BUTTONS — touch-friendly globally ── */
+/* STATUS BORDERS */
+.drv-new{border-right-color:#ef4444}.drv-reminder{border-right-color:#f97316}
+.drv-check{border-right-color:#eab308}.drv-pending{border-right-color:#f97316}
+.drv-partial{border-right-color:#a855f7}.drv-notified{border-right-color:#3b82f6}
+.drv-done{border-right-color:#22c55e}.drv-no_contact,.drv-no_phone,.drv-no_wa{border-right-color:#334155}
+
+/* BADGES */
+.b-new{background:rgba(239,68,68,.15);color:#f87171}.b-reminder{background:rgba(249,115,22,.15);color:#fb923c}
+.b-check{background:rgba(234,179,8,.15);color:#fbbf24}.b-pending{background:rgba(249,115,22,.15);color:#fb923c}
+.b-partial{background:rgba(168,85,247,.15);color:#c084fc}.b-notified{background:rgba(59,130,246,.15);color:#60a5fa}
+.b-done{background:rgba(34,197,94,.15);color:#4ade80}
+.b-no_contact,.b-no_phone,.b-no_wa{background:rgba(51,65,85,.4);color:#64748b}
+
+/* VIOLATION ROWS */
+.viol-row { padding:8px 12px; margin:4px 0; border-radius:8px; background:#111827; border-right:3px solid #334155; font-size:13px; line-height:1.6; }
+.viol-paid{border-right-color:#22c55e}.viol-unpaid{border-right-color:#ef4444}
+
+/* BUTTONS */
 .stButton > button {
-    min-height: 44px;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    border-radius: 8px !important;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
+    min-height:44px; font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+    border-radius:10px!important; font-weight:600!important; font-size:14px!important;
+    touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+    transition:all .15s!important; letter-spacing:.3px;
+}
+.stButton > button:hover  { opacity:.88!important; transform:translateY(-1px)!important; }
+.stButton > button:active { opacity:.72!important; transform:scale(.97)!important; }
+
+/* SIDEBAR */
+section[data-testid="stSidebar"] { background:linear-gradient(180deg,#0d1626,#0a0f1e)!important; border-left:1px solid #1e293b; }
+[data-testid="stSidebar"] .stRadio > div { gap:2px!important; }
+[data-testid="stSidebar"] .stRadio label { border-radius:8px!important; padding:10px 14px!important; font-size:14px!important; transition:background .15s!important; }
+[data-testid="stSidebar"] .stRadio label:hover { background:rgba(96,165,250,.1)!important; }
+[data-testid="stSidebar"] .stCheckbox label { font-size:13px!important; }
+
+/* TABLET <=1100px */
+@media screen and (max-width:1100px) {
+    .block-container { padding-left:.6rem!important; padding-right:.6rem!important; }
+    .stButton > button { min-height:48px!important; }
 }
 
-/* ── TABLET ≤1100px ── */
-@media screen and (max-width: 1100px) {
-    .block-container { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
-    .stButton > button { min-height: 48px !important; font-size: 15px !important; }
-    .drv-card { padding: 14px 18px !important; font-size: 14px !important; }
+/* MOBILE <=768px */
+@media screen and (max-width:768px) {
+    [data-testid="stHorizontalBlock"] { flex-direction:column!important; gap:.4rem!important; }
+    [data-testid="stColumn"] { width:100%!important; min-width:100%!important; flex:unset!important; }
+    input,textarea,select { font-size:16px!important; -webkit-text-size-adjust:100%; }
+    .stTextInput input,.stTextArea textarea,.stNumberInput input { font-size:16px!important; }
+    .stButton > button { min-height:54px!important; font-size:16px!important; border-radius:12px!important; }
+    .drv-card { padding:15px 16px!important; margin:6px 0!important; border-radius:14px!important; }
+    .dc-name { font-size:16px!important; }
+    .dc-badge { font-size:12px!important; padding:5px 12px!important; }
+    div[data-testid="metric-container"] { padding:12px!important; border-radius:12px!important; }
+    div[data-testid="stMetricLabel"] { font-size:10px!important; }
+    div[data-testid="stMetricValue"] { font-size:22px!important; }
+    .block-container { padding:.5rem!important; padding-top:.5rem!important; }
+    button[data-baseweb="tab"] { font-size:12px!important; padding:.45rem .5rem!important; }
+    section[data-testid="stSidebar"] { min-width:min(88vw,300px)!important; }
+    [data-testid="stSidebar"] .stRadio label { padding:12px 14px!important; font-size:15px!important; }
+    [data-testid="stSidebar"] .stCheckbox label { padding:9px 4px!important; font-size:14px!important; }
+    hr { margin:.5rem 0!important; }
+    h2 { font-size:1.25rem!important; }
 }
 
-/* ── MOBILE ≤768px ── */
-@media screen and (max-width: 768px) {
-    /* Stack all columns */
-    [data-testid="stHorizontalBlock"] {
-        flex-direction: column !important;
-        gap: 0.5rem !important;
-    }
-    [data-testid="stColumn"] {
-        width: 100% !important;
-        min-width: 100% !important;
-        flex: unset !important;
-    }
-    /* Prevent iOS input zoom — must be ≥16px */
-    input, textarea, select { font-size: 16px !important; -webkit-text-size-adjust: 100%; }
-    .stTextInput input, .stTextArea textarea,
-    .stNumberInput input, .stSelectbox div { font-size: 16px !important; }
-    /* Big tap targets */
-    .stButton > button {
-        min-height: 56px !important;
-        font-size: 17px !important;
-        border-radius: 12px !important;
-        padding: 0 1.4rem !important;
-    }
-    .stButton > button:active { opacity: 0.75; transform: scale(0.98); }
-    /* Cards */
-    .drv-card {
-        padding: 16px 18px !important;
-        margin: 7px 0 !important;
-        font-size: 15px !important;
-        border-radius: 12px !important;
-        border-right-width: 5px !important;
-    }
-    /* Metrics */
-    div[data-testid="metric-container"] {
-        padding: 12px !important; border-radius: 12px !important;
-    }
-    div[data-testid="stMetricLabel"]  { font-size: 11px !important; }
-    div[data-testid="stMetricValue"]  { font-size: 20px !important; }
-    /* Less container padding */
-    .block-container { padding: 0.6rem !important; padding-top: 0.6rem !important; }
-    /* Tabs */
-    button[data-baseweb="tab"] { font-size: 13px !important; padding: 0.5rem 0.6rem !important; }
-    /* Radio bigger tap */
-    [data-testid="stRadio"] label    { padding: 10px 6px !important; font-size: 15px !important; }
-    [data-testid="stCheckbox"] label { padding: 8px 4px !important; font-size: 14px !important; }
-    /* Sidebar */
-    section[data-testid="stSidebar"] { min-width: min(85vw, 300px) !important; }
-    /* Headers */
-    h2 { font-size: 1.3rem !important; }
-    h3 { font-size: 1.1rem !important; }
-    /* Expander */
-    [data-testid="stExpander"] summary { font-size: 15px !important; padding: 0.8rem !important; }
-    /* Divider */
-    hr { margin: 0.6rem 0 !important; }
-}
-
-/* ── SMALL PHONES ≤480px ── */
-@media screen and (max-width: 480px) {
-    .block-container { padding: 0.4rem !important; }
-    .drv-card { padding: 14px !important; }
-    .stButton > button { min-height: 54px !important; }
+/* SMALL PHONES <=480px */
+@media screen and (max-width:480px) {
+    .block-container { padding:.35rem!important; }
+    .stButton > button { min-height:52px!important; }
 }
 
 </style>""", unsafe_allow_html=True)
@@ -148,25 +145,25 @@ def get_user():
 # ═══════════════════════════════════════════════════════════
 # DATA — LOAD
 # ═══════════════════════════════════════════════════════════
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=60)
 def _viols():
     r = _hx.get(f"{_base()}/rest/v1/violations?select=*", headers=_rh(), timeout=30)
     d = r.json() if r.status_code == 200 else []
     return pd.DataFrame(d) if d else pd.DataFrame()
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=60)
 def _pays():
     r = _hx.get(f"{_base()}/rest/v1/payments?select=*", headers=_rh(), timeout=30)
     d = r.json() if r.status_code == 200 else []
     return pd.DataFrame(d) if d else pd.DataFrame()
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=60)
 def _notifs():
     r = _hx.get(f"{_base()}/rest/v1/notifications?select=*", headers=_rh(), timeout=30)
     d = r.json() if r.status_code == 200 else []
     return pd.DataFrame(d) if d else pd.DataFrame()
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=60)
 def _rems():
     r = _hx.get(f"{_base()}/rest/v1/reminders?select=*", headers=_rh(), timeout=30)
     d = r.json() if r.status_code == 200 else []
@@ -329,6 +326,11 @@ SL = {
     "pending":"🟠 معلق","partial":"🟣 دفع جزئي","notified":"🔵 تم التبليغ",
     "done":"🟢 تم","no_contact":"⚫ لا داعي","no_phone":"⚫ بلا رقم","no_wa":"⚫ بلا واتساب",
 }
+SL_SHORT = {
+    "new":"جديد","reminder":"تذكير","check":"تشيك","pending":"معلق",
+    "partial":"جزئي","notified":"تبليغ","done":"تم",
+    "no_contact":"لا داعي","no_phone":"بلا رقم","no_wa":"بلا واتساب",
+}
 PR = {"reminder":0,"new":1,"check":2,"pending":3,"partial":4,
       "notified":5,"done":6,"no_contact":7,"no_phone":8,"no_wa":9}
 
@@ -476,20 +478,22 @@ def pg_drivers(user):
     left,right=st.columns([1,1.6])
 
     # driver list
-    CMAP={"new":"#ef4444","reminder":"#f97316","check":"#eab308","pending":"#f97316",
-          "partial":"#a855f7","notified":"#3b82f6","done":"#22c55e"}
     with left:
         st.markdown(f"**السائقون ({len(shown)})**")
         for i,d in enumerate(shown):
-            color=CMAP.get(d["sk"],"#6b7280")
-            bg="#1a2744" if st.session_state.get("sel")==d["key"] else "#111827"
             rem_disp=famt(d["remaining"]) if d["remaining"]>0 else famt(d["tp"])
-            st.markdown(f"""<div class="drv-card drv-{d['sk']}" style="background:{bg}">
-                <span style="color:{color};font-weight:bold">{d['label']}</span>
-                &nbsp;&nbsp;<strong>{d['name']}</strong><br>
-                <small style="color:#9ca3af">📋 {d['plate']} &nbsp;|&nbsp; {d['count']} مخالفة &nbsp;|&nbsp; {rem_disp} ريال</small>
-            </div>""",unsafe_allow_html=True)
-            if st.button("اختر ←",key=f"d{i}",use_container_width=True):
+            sel_cls = "drv-sel" if st.session_state.get("sel")==d["key"] else ""
+            st.markdown(f"""<div class="drv-card drv-{d['sk']} {sel_cls}">
+              <div class="dc-info">
+                <span class="dc-name">{d['name']}</span>
+                <span class="dc-sub">&#x1F697; {d['plate']} &nbsp;&middot;&nbsp; {d['count']} مخالفة</span>
+              </div>
+              <div class="dc-side">
+                <span class="dc-badge b-{d['sk']}">{SL_SHORT.get(d['sk'],d['sk'])}</span>
+                <span class="dc-amt">{rem_disp} ر</span>
+              </div>
+            </div>""", unsafe_allow_html=True)
+            if st.button("اختر",key=f"d{i}",use_container_width=True):
                 st.session_state.sel=d["key"]
                 st.session_state.sf=st.session_state.pf=st.session_state.sysv=False
                 st.rerun()
@@ -502,7 +506,12 @@ def pg_drivers(user):
             st.info("👈 اختر سائقاً من القائمة")
             return
 
-        st.markdown(f"## {sel['name']}")
+        bc1,bc2=st.columns([1,4])
+        with bc1:
+            if st.button("← رجوع",key="back_drv",use_container_width=True):
+                st.session_state.sel=None; st.rerun()
+        with bc2:
+            st.markdown(f"<h3 style='margin:4px 0;color:#f1f5f9'>{sel['name']}</h3>",unsafe_allow_html=True)
         h1,h2,h3=st.columns(3)
         h1.metric("📱 الجوال",sel["phone"])
         h2.metric("🚗 اللوحة",sel["plate"])
@@ -529,12 +538,12 @@ def pg_drivers(user):
         for i,v in enumerate(sel["rows"],1):
             ss=str(v.get("system_status","")).strip()
             paid="مدفوع" in ss
+            paid_cls="viol-paid" if paid else "viol-unpaid"
             st.markdown(
-                f"<div style='padding:6px 10px;margin:3px 0;border-radius:5px;background:#111827;"
-                f"border-right:3px solid {'#22c55e' if paid else '#ef4444'}'>"
-                f"{'🟢' if paid else '🔴'} <b>{i}.</b> {jlbl(v.get('authority'))} | "
-                f"{fdt(v.get('violation_date'))} | <b>{famt(v.get('amount'))} ريال</b> | "
-                f"{ss} | <code>{v.get('violation_id','')}</code></div>",
+                f"<div class='viol-row {paid_cls}'>"
+                f"{'&#x2705;' if paid else '&#x274C;'} <b>{jlbl(v.get('authority'))}</b> &nbsp;&middot;&nbsp; "
+                f"{fdt(v.get('violation_date'))} &nbsp;&middot;&nbsp; <b>{famt(v.get('amount'))} ريال</b>"
+                f"<br><small style='color:#475569'>{ss} &nbsp; {v.get('violation_id','')}</small></div>",
                 unsafe_allow_html=True)
 
         if sel["remaining"]>0:
