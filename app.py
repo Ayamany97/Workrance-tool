@@ -66,10 +66,7 @@ st.set_page_config(page_title="Workrance", page_icon="🚛", layout="wide",
 st.markdown("""<style>
 
 /* ── BASE ── */
-.stApp { background:#0a0f1e; }
-/* RTL on content only — NOT on .stApp so sidebar stays left-anchored */
-.block-container { direction:rtl; }
-[data-testid="stSidebar"] > div { direction:rtl; }
+.stApp { direction:rtl; background:#0a0f1e; }
 .stTextArea textarea, .stTextInput input { direction:rtl; font-family:'Segoe UI',Tahoma,Arial,sans-serif; }
 .stTextArea textarea { line-height:1.85; font-size:14px; }
 .block-container { padding-top:4rem!important; padding-bottom:2rem!important; }
@@ -185,14 +182,46 @@ header[data-testid="stHeader"] { background:rgba(10,15,30,0.95)!important; backd
 /* ── SIDEBAR ── */
 section[data-testid="stSidebar"] {
     background:linear-gradient(180deg,#0d1626,#0a0f1e)!important;
-    border-right:1px solid #1e293b;
-    /* NO min/max-width — let Streamlit control collapse/expand freely */
+    border-left:1px solid #1e293b;
 }
 section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!important; }
 [data-testid="stSidebar"] .stRadio > div { gap:2px!important; }
 [data-testid="stSidebar"] .stRadio label { border-radius:8px!important; padding:10px 14px!important; font-size:14px!important; transition:background .15s!important; }
 [data-testid="stSidebar"] .stRadio label:hover { background:rgba(96,165,250,.1)!important; }
 [data-testid="stSidebar"] .stCheckbox label { font-size:13px!important; }
+
+/* ── MOBILE SIDEBAR — fix RTL collapse direction ── */
+/* Streamlit collapses with translateX(-110%) which in RTL lands at center.
+   We anchor the sidebar to right:0 and redirect the negative-X collapse
+   to positive-X so it exits off-screen to the RIGHT. */
+@media (max-width:768px) {
+    section[data-testid="stSidebar"] {
+        position:fixed!important;
+        right:0!important; left:auto!important;
+        top:0!important; height:100vh!important;
+        z-index:999!important;
+        width:82vw!important; max-width:300px!important;
+        transform:translateX(0)!important;
+        transition:transform .25s ease!important;
+        box-shadow:-4px 0 20px rgba(0,0,0,.5)!important;
+    }
+    /* Intercept Streamlit's negative-X collapse → redirect to right */
+    section[data-testid="stSidebar"][style*="translateX(-"] {
+        transform:translateX(110%)!important;
+    }
+    /* Open (>>) button — pin to right edge */
+    [data-testid="collapsedControl"] {
+        position:fixed!important;
+        right:0!important; left:auto!important;
+        top:50%!important;
+        transform:translateY(-50%)!important;
+        z-index:998!important;
+        border-radius:10px 0 0 10px!important;
+        border-right:none!important;
+        border-left:2px solid #334155!important;
+        padding:8px 6px!important;
+    }
+}
 
 /* ── SIDEBAR COLLAPSE / CLOSE BUTTON ── */
 [data-testid="stSidebarCollapseButton"] button,
@@ -201,14 +230,10 @@ section[data-testid="stSidebar"] > div:first-child { padding:0.9rem 0.75rem!impo
     background:rgba(96,165,250,.2)!important;
     border-radius:8px!important; border:1px solid #334155!important;
 }
-/* >> open button — make it stand out against the dark app background */
 [data-testid="collapsedControl"] {
     background:#0d1626!important;
     border:2px solid #334155!important;
-    border-left:none!important;
-    border-radius:0 10px 10px 0!important;
-    padding:6px 4px!important;
-    box-shadow:3px 0 10px rgba(0,0,0,.4)!important;
+    box-shadow:-3px 0 10px rgba(0,0,0,.4)!important;
 }
 [data-testid="collapsedControl"] button {
     color:#93c5fd!important; opacity:1!important; font-size:16px!important;
