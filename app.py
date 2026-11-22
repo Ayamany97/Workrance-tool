@@ -846,7 +846,7 @@ def pg_drivers(user):
                          else f'{ico("x-c",15,"#ef4444")}')
             paid_lbl = " — مدفوعة" if paid and vid in dpays_vids else ""
             st.markdown('<div class="viol-act-row">', unsafe_allow_html=True)
-            vc1, vc2, vc3 = st.columns([10, 1, 1])
+            vc1, vc2, vc3, vc4, vc5 = st.columns([6, 1, 1, 1, 1])
             with vc1:
                 st.markdown(
                     f'<div class="viol-row {"viol-paid" if paid else "viol-unpaid"}">'
@@ -861,23 +861,79 @@ def pg_drivers(user):
                     f'</div>',
                     unsafe_allow_html=True)
             with vc2:
+                if not paid and st.button("📵", key=f"nw_{vid}", use_container_width=True, help="بلا واتساب"):
+                    if st.session_state.get("nowa_v") == vid:
+                        st.session_state.pop("nowa_v", None)
+                    else:
+                        st.session_state["nowa_v"] = vid
+                        for _k in ("paid_v","edit_v","del_confirm"): st.session_state.pop(_k, None)
+                    st.rerun()
+            with vc3:
+                if not paid and st.button("💵", key=f"pq_{vid}", use_container_width=True, help="مدفوعة"):
+                    if st.session_state.get("paid_v") == vid:
+                        st.session_state.pop("paid_v", None)
+                    else:
+                        st.session_state["paid_v"] = vid
+                        for _k in ("nowa_v","edit_v","del_confirm"): st.session_state.pop(_k, None)
+                    st.rerun()
+            with vc4:
                 if st.button("✏️", key=f"ev_{vid}", use_container_width=True, help="تعديل"):
                     if st.session_state.get("edit_v") == vid:
                         st.session_state.pop("edit_v", None)
                     else:
                         st.session_state["edit_v"] = vid
-                        st.session_state.pop("del_confirm", None)
+                        for _k in ("nowa_v","paid_v","del_confirm"): st.session_state.pop(_k, None)
                     st.rerun()
-            with vc3:
+            with vc5:
                 if st.button("🗑️", key=f"dv_{vid}", use_container_width=True, help="حذف"):
                     if st.session_state.get("del_confirm") == vid:
                         st.session_state.pop("del_confirm", None)
                     else:
                         st.session_state["del_confirm"] = vid
-                        st.session_state.pop("edit_v", None)
+                        for _k in ("nowa_v","paid_v","edit_v"): st.session_state.pop(_k, None)
                         st.toast("⚠ اضغط تأكيد لإتمام الحذف")
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
+
+            # ── بلا واتساب confirmation ──
+            if st.session_state.get("nowa_v") == vid:
+                st.info(f"تعيين **{sel['name']}** كبلا واتساب؟ (سيُطبَّق على جميع مخالفاته)")
+                nw1, nw2 = st.columns(2)
+                with nw1:
+                    if st.button("تأكيد", type="primary", key=f"nwok_{vid}", use_container_width=True):
+                        upd_status(sel["name"], sel["phone"], sel["plate"], "بلا واتساب")
+                        st.toast(f"✓ {sel['name']} — بلا واتساب")
+                        st.session_state.pop("nowa_v", None)
+                        st.session_state["sel"] = None
+                        bust(); st.rerun()
+                with nw2:
+                    if st.button("إلغاء", key=f"nwcan_{vid}", use_container_width=True):
+                        st.session_state.pop("nowa_v", None)
+                        st.rerun()
+
+            # ── مدفوعة quick form ──
+            if st.session_state.get("paid_v") == vid:
+                collector = st.radio("من جمّع؟", ["أحمد", "رهف", "آخر"],
+                                     horizontal=True, key=f"pqcol_{vid}")
+                other_col = ""
+                if collector == "آخر":
+                    other_col = st.text_input("اسم الموظف:", key=f"pqoth_{vid}")
+                pq1, pq2 = st.columns(2)
+                with pq1:
+                    if st.button("تأكيد: مدفوعة", type="primary", key=f"pqok_{vid}", use_container_width=True):
+                        today_d, _, _ = now_sa_str()
+                        amt_v = float(v.get("amount") or 0)
+                        add_payment(vid, sel["name"], sel["phone"], sel["plate"],
+                                    amt_v, "كامل", "نقد", "", "", collector, other_col,
+                                    "مؤكد", today_d, "")
+                        upd_violation(vid, "تم الدفع")
+                        st.toast(f"✓ مدفوعة — {jlbl(v.get('authority'))}")
+                        st.session_state.pop("paid_v", None)
+                        bust(); st.rerun()
+                with pq2:
+                    if st.button("إلغاء", key=f"pqcan_{vid}", use_container_width=True):
+                        st.session_state.pop("paid_v", None)
+                        st.rerun()
 
             # ── edit form ──
             if st.session_state.get("edit_v") == vid:
