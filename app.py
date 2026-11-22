@@ -293,6 +293,13 @@ def upsert_rem(phone, plate, name, rdate, note, by):
              headers=_h({"Prefer":"resolution=merge-duplicates,return=minimal"}), timeout=30)
     bust()
 
+def mark_rem_done(phone, plate):
+    _hx.patch(f"{_base()}/rest/v1/reminders",
+              params={"phone":f"eq.{phone}","plate":f"eq.{plate}"},
+              json={"is_done":True},
+              headers=_h({"Prefer":"return=minimal"}), timeout=30)
+    bust()
+
 def add_payment(vid, name, phone, plate, amt, ptype, method,
                 receipt_url, receipt_ref, collector, other_col, verif, pdate, notes):
     _hx.post(f"{_base()}/rest/v1/payments",
@@ -544,19 +551,48 @@ def pg_drivers(user):
 
     # sidebar filters
     with st.sidebar:
-        st.markdown("**الفلتر:**")
-        fn  = st.checkbox("🔴 جديد",        value=True)
-        fr  = st.checkbox("🔔 تذكير اليوم", value=True)
-        fc  = st.checkbox("🟡 تشيك",        value=True)
-        fp  = st.checkbox("🟠 معلق",        value=True)
-        fpa = st.checkbox("🟣 دفع جزئي",   value=True)
-        fnt = st.checkbox("🔵 تم التبليغ", value=False)
-        fd  = st.checkbox("🟢 تم",          value=False)
+        sc1, sc2 = st.columns(2)
+        with sc1: st.markdown("**الفلتر:**")
+        with sc2:
+            show_all = st.toggle("الكل", value=False)
+        if show_all:
+            fn=fr=fc=fp=fpa=fnt=fd=True
+        else:
+            fn  = st.checkbox("🔴 جديد",        value=True)
+            fr  = st.checkbox("🔔 تذكير اليوم", value=True)
+            fc  = st.checkbox("🟡 تشيك",        value=True)
+            fp  = st.checkbox("🟠 معلق",        value=True)
+            fpa = st.checkbox("🟣 دفع جزئي",   value=True)
+            fnt = st.checkbox("🔵 تم التبليغ", value=False)
+            fd  = st.checkbox("🟢 تم",          value=False)
         st.divider()
         srch=st.text_input("بحث",placeholder="اسم أو لوحة...")
         st.divider()
         if st.button("تحديث",use_container_width=True):
             bust(); st.rerun()
+
+        # ── upcoming reminders ──
+        upcoming = sorted(
+            [(k,v) for k,v in rems.items()
+             if not v.get("is_done") and str(v.get("reminder_date","9999")) >= today_iso],
+            key=lambda x: x[1].get("reminder_date","")
+        )
+        if upcoming:
+            st.divider()
+            with st.expander(f"التذكيرات القادمة ({len(upcoming)})"):
+                for _, r in upcoming[:8]:
+                    rdate = r.get("reminder_date","")
+                    is_today = rdate == today_iso
+                    color = "#f97316" if is_today else "#64748b"
+                    dot   = "🔔" if is_today else "·"
+                    st.markdown(
+                        f"<div style='padding:5px 0;border-bottom:1px solid #1e293b;font-size:12px'>"
+                        f"<span style='color:{color}'>{dot}</span> "
+                        f"<b style='color:#e2e8f0'>{r.get('driver_name','')}</b> "
+                        f"<span style='color:#475569'>{rdate}</span>"
+                        + (f"<br><span style='color:#475569;padding-right:14px'>{r.get('note','')}</span>" if r.get("note") else "")
+                        + "</div>",
+                        unsafe_allow_html=True)
 
     fm={"new":fn,"reminder":fr,"check":fc,"pending":fp,"partial":fpa,"notified":fnt,"done":fd}
     shown=[d for d in drivers
@@ -644,8 +680,15 @@ def pg_drivers(user):
         if rem.get("reminder_date"):
             overdue = str(rem["reminder_date"]) <= today_iso
             lbl = "متأخر" if overdue else "تذكير"
-            st.warning(f"{'⚠️' if overdue else '⏰'} {lbl}: {rem['reminder_date']}"
-                       + (f"  —  {rem['note']}" if rem.get("note") else ""))
+            ra1, ra2 = st.columns([6, 1])
+            with ra1:
+                st.warning(f"{'⚠️' if overdue else '⏰'} {lbl}: {rem['reminder_date']}"
+                           + (f"  —  {rem['note']}" if rem.get("note") else ""))
+            with ra2:
+                if st.button("تم ✓", key=f"rdone_{sk}", use_container_width=True):
+                    mark_rem_done(sel["phone"], sel["plate"])
+                    st.toast(f"تم إنجاز تذكير {sel['name']}")
+                    st.rerun()
 
         # payment summary
         if sel["pays"]:
@@ -757,7 +800,7 @@ def pg_drivers(user):
                     upd_status(sel["name"],sel["phone"],sel["plate"],f"{new_st} {full_d}",nv,today_d)
                     log_notif(sel["name"],sel["phone"],sel["plate"],"تبليغ",user,nv)
                     upsert_rem(sel["phone"],sel["plate"],sel["name"],rd,nv,user)
-                    st.success("تم الحفظ")
+                    st.toast(f"✓ حُفظ: {new_st} — {sel['name']}")
                     st.session_state.sf=False; st.session_state.sel=None; st.rerun()
             with sc2:
                 if st.button("إلغاء",key=f"scc_{sk}",use_container_width=True):
@@ -802,7 +845,7 @@ def pg_drivers(user):
                                 else "بانتظار تأكيد الدفع" if verif!="مؤكد"
                                 else "مدفوع جزئياً")
                         upd_status(sel["name"],sel["phone"],sel["plate"],new_sk)
-                        st.success(f"تم تسجيل {famt(amt)} ريال")
+                        st.toast(f"✓ تم تسجيل {famt(amt)} ريال — {sel['name']}")
                         st.session_state.pf=False; bust(); st.rerun()
             with ps2:
                 if st.button("إلغاء",key=f"pcc_{sk}",use_container_width=True):
