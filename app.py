@@ -1336,6 +1336,9 @@ def pg_admin():
                     to_add=ndf_[~ndf_["_v"].isin(ex_ids)]
                     added=0; batch=[]
                     def _ss(v): return str(v).strip() if v and str(v) not in ("nan","None") else ""
+                    def _dt(v):
+                        try: return pd.to_datetime(v).strftime("%Y-%m-%d")
+                        except: return ""
                     for _,row in to_add.iterrows():
                         vid=_ss(row.get("رقم المخالفة"))
                         if not vid: continue
@@ -1343,20 +1346,23 @@ def pg_admin():
                         asgn=""
                         if "احمد" in st_v.lower() or "أحمد" in st_v: asgn="أحمد"
                         elif "رهف" in st_v: asgn="رهف"
-                        batch.append({
+                        rec={
                             "violation_id":vid,
                             "driver_name":_ss(row.get("السائق")),
                             "phone":cp(row.get("الجوال","")),
                             "plate":_ss(row.get("اللوحة (نظام)")),
                             "authority":_ss(row.get("الجهة")),
-                            "violation_date":fdt(row.get("التاريخ")),
+                            "violation_date":_dt(row.get("التاريخ")),
                             "amount":float(row.get("المبلغ",0)) if not pd.isna(row.get("المبلغ",0)) else 0,
                             "system_status":_ss(row.get("حالة السستم")) or "معلقة",
                             "system_notified":_ss(row.get("التبليغ (السستم)")),
                             "match_status":_ss(row.get("حالة المطابقة")) or "مؤكدة",
                             "status":"جديد","my_notes":_ss(row.get("ملاحظاتي")),
                             "assigned_to":asgn,"manually_added":False,
-                        })
+                        }
+                        cd=_dt(row.get("تاريخ التواصل"))
+                        if cd: rec["contact_date"]=cd
+                        batch.append(rec)
                         if len(batch)>=50:
                             _hx.post(f"{_base()}/rest/v1/violations",json=batch,
                                      headers=_h({"Prefer":"return=minimal"}),timeout=60)
