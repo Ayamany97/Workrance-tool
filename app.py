@@ -347,12 +347,27 @@ def bust():
 # DATA — WRITE
 # ══════════════════════════════════════════════════════════
 def upd_status(name, phone, plate, status, notes="", cdate=""):
+    """Update by name/phone/plate — kept for confirm_pay flow."""
     d = {"status":status,"updated_at":datetime.now(RIYADH).isoformat()}
     if cdate: d["contact_date"] = cdate
     if notes: d["my_notes"] = notes
     db_phone = "" if phone == "بلا رقم" else phone
+    db_plate = "" if plate == "غير محدد" else plate
     _hx.patch(f"{_base()}/rest/v1/violations",
-              params={"driver_name":f"eq.{name}","phone":f"eq.{db_phone}","plate":f"eq.{plate}"},
+              params={"driver_name":f"eq.{name}","phone":f"eq.{db_phone}","plate":f"eq.{db_plate}"},
+              json=d, headers=_h({"Prefer":"return=minimal"}), timeout=30)
+    bust()
+
+def upd_driver_status(rows, status, notes="", cdate=""):
+    """Update ALL violations of a driver by their IDs — guaranteed to match."""
+    vids = [r.get("violation_id","") for r in rows if r.get("violation_id","")]
+    if not vids: return
+    d = {"status":status,"updated_at":datetime.now(RIYADH).isoformat()}
+    if cdate: d["contact_date"] = cdate
+    if notes: d["my_notes"] = notes
+    ids_str = "(" + ",".join(vids) + ")"
+    _hx.patch(f"{_base()}/rest/v1/violations",
+              params={"violation_id":f"in.{ids_str}"},
               json=d, headers=_h({"Prefer":"return=minimal"}), timeout=30)
     bust()
 
@@ -899,7 +914,7 @@ def pg_drivers(user):
                 nw1, nw2 = st.columns(2)
                 with nw1:
                     if st.button("تأكيد", type="primary", key=f"nwok_{vid}", use_container_width=True):
-                        upd_status(sel["name"], sel["phone"], sel["plate"], "بلا واتساب")
+                        upd_driver_status(sel["rows"], "بلا واتساب")
                         st.toast(f"✓ {sel['name']} — بلا واتساب")
                         st.session_state.pop("nowa_v", None)
                         st.session_state["sel"] = None
@@ -1039,7 +1054,7 @@ def pg_drivers(user):
             with sc1:
                 if st.button("حفظ",type="primary",key=f"ssv_{sk}",use_container_width=True):
                     today_d,time_d,full_d=now_sa_str()
-                    upd_status(sel["name"],sel["phone"],sel["plate"],f"{new_st} {full_d}",nv,today_d)
+                    upd_driver_status(sel["rows"],f"{new_st} {full_d}",nv,today_d)
                     log_notif(sel["name"],sel["phone"],sel["plate"],"تبليغ",user,nv)
                     upsert_rem(sel["phone"],sel["plate"],sel["name"],rd,nv,user)
                     st.toast(f"✓ حُفظ: {new_st} — {sel['name']}")
