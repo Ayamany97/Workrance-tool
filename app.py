@@ -669,7 +669,20 @@ def pg_drivers(user):
         st.warning("لا توجد بيانات. ارفع إكسل من صفحة الإدارة.")
         return
 
+    # ── date filter (before build_drivers so counts reflect the selected period) ──
+    _DATE_OPTS = ["الكل","آخر 7 أيام","هذا الشهر","آخر 30 يوم","آخر 90 يوم"]
+    with st.sidebar:
+        date_flt = st.selectbox("",_DATE_OPTS,key="date_flt",label_visibility="collapsed")
+    if date_flt != "الكل" and not vdf.empty and "violation_date" in vdf.columns:
+        _cuts={"آخر 7 أيام":(today-timedelta(days=7)).isoformat(),
+               "هذا الشهر":today.replace(day=1).isoformat(),
+               "آخر 30 يوم":(today-timedelta(days=30)).isoformat(),
+               "آخر 90 يوم":(today-timedelta(days=90)).isoformat()}
+        _cut=_cuts.get(date_flt)
+        if _cut: vdf=vdf[vdf["violation_date"].fillna("").astype(str)>=_cut]
+
     drivers=build_drivers(vdf,pdf,rems,today_iso)
+    cnt={k:sum(1 for d in drivers if d["sk"]==k) for k in PR}
 
     # sidebar filters
     with st.sidebar:
@@ -677,16 +690,16 @@ def pg_drivers(user):
         if show_all:
             fn=fr=fc=fp=fpa=fnt=fd=fnph=fnwa=fnc=True
         else:
-            fn  = st.checkbox("🔴 جديد",        value=True)
-            fr  = st.checkbox("🔔 تذكير اليوم", value=True)
-            fc  = st.checkbox("🟡 تشيك",        value=True)
-            fp  = st.checkbox("🟠 معلق",        value=True)
-            fpa = st.checkbox("🟣 دفع جزئي",   value=True)
-            fnt = st.checkbox("🔵 تم التبليغ", value=False)
-            fd  = st.checkbox("🟢 تم",          value=False)
-            fnph= st.checkbox("⚫ بلا رقم",     value=True)
-            fnwa= st.checkbox("⚫ بلا واتساب",  value=True)
-            fnc = st.checkbox("⚫ لا داعي",     value=False)
+            fn  = st.checkbox(f"🔴 جديد ({cnt.get('new',0)})",          value=True)
+            fr  = st.checkbox(f"🔔 تذكير ({cnt.get('reminder',0)})",     value=True)
+            fc  = st.checkbox(f"🟡 تشيك ({cnt.get('check',0)})",         value=True)
+            fp  = st.checkbox(f"🟠 معلق ({cnt.get('pending',0)})",       value=True)
+            fpa = st.checkbox(f"🟣 جزئي ({cnt.get('partial',0)})",       value=True)
+            fnt = st.checkbox(f"🔵 تبليغ ({cnt.get('notified',0)})",     value=False)
+            fd  = st.checkbox(f"🟢 تم ({cnt.get('done',0)})",            value=False)
+            fnph= st.checkbox(f"⚫ بلا رقم ({cnt.get('no_phone',0)})",   value=True)
+            fnwa= st.checkbox(f"⚫ بلا واتساب ({cnt.get('no_wa',0)})",   value=True)
+            fnc = st.checkbox(f"⚫ لا داعي ({cnt.get('no_contact',0)})", value=False)
         st.divider()
         srch=st.text_input("",placeholder="بحث: اسم أو لوحة...",label_visibility="collapsed")
         sc1, sc2 = st.columns([1,1])
@@ -729,7 +742,6 @@ def pg_drivers(user):
     page_shown = shown[page_start : page_start + PER_PAGE]
 
     # ── stat strip (custom HTML) ──
-    cnt={k:sum(1 for d in drivers if d["sk"]==k) for k in PR}
     cards_html = ""
     for sk, color, icon_name, label in STAT_CFG:
         n = cnt.get(sk, 0)
@@ -1408,32 +1420,51 @@ def pg_admin():
                 except Exception as e: st.error(f"خطأ: {e}")
 
     with t3:
-        st.markdown("### تصدير كامل")
-        if st.button("تصدير إكسل كامل",type="primary"):
-            vdf=_viols(); pdf=_pays(); ndf=_notifs()
-            if vdf.empty: st.error("لا توجد بيانات"); return
-            with st.spinner("جاري التصدير..."):
-                out=io.BytesIO()
-                with pd.ExcelWriter(out,engine="openpyxl") as w:
-                    exp=vdf.rename(columns={
-                        "driver_name":"السائق","phone":"الجوال","plate":"اللوحة (نظام)",
-                        "authority":"الجهة","violation_id":"رقم المخالفة",
-                        "violation_date":"التاريخ","amount":"المبلغ",
-                        "system_status":"حالة السستم","system_notified":"التبليغ (السستم)",
-                        "match_status":"حالة المطابقة","status":"الحالة",
-                        "my_notes":"ملاحظاتي","contact_date":"تاريخ التواصل",
-                    })
-                    exp.to_excel(w,index=False,sheet_name="الكل")
-                    for lbl,kw in [("مطلوب أحمد","أحمد"),("مطلوب رهف","رهف")]:
-                        sub=vdf[vdf["status"].str.contains(kw,na=False)]
-                        if not sub.empty: sub.to_excel(w,index=False,sheet_name=lbl)
-                    if not pdf.empty: pdf.to_excel(w,index=False,sheet_name="المدفوعات")
-                    if not ndf.empty: ndf.to_excel(w,index=False,sheet_name="سجل التواصل")
-                out.seek(0)
-            st.download_button("تحميل الملف",out,
-                file_name=f"Workrance_{date.today()}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary")
+        st.markdown("### تصدير")
+        vdf_e=_viols(); pdf_e=_pays(); ndf_e=_notifs()
+        if vdf_e.empty:
+            st.warning("لا توجد بيانات للتصدير")
+        else:
+            ec1,ec2=st.columns(2)
+            with ec1:
+                exp_date=st.selectbox("الفترة:",["الكل","آخر 7 أيام","هذا الشهر","آخر 30 يوم","آخر 90 يوم"],key="exp_dt")
+            with ec2:
+                exp_status=st.multiselect("الحالات:",list(SL_SHORT.values()),placeholder="كل الحالات")
+            if exp_date!="الكل" and "violation_date" in vdf_e.columns:
+                _d2=date.today()
+                _c2={"آخر 7 أيام":(_d2-timedelta(days=7)).isoformat(),
+                     "هذا الشهر":_d2.replace(day=1).isoformat(),
+                     "آخر 30 يوم":(_d2-timedelta(days=30)).isoformat(),
+                     "آخر 90 يوم":(_d2-timedelta(days=90)).isoformat()}.get(exp_date)
+                if _c2: vdf_e=vdf_e[vdf_e["violation_date"].fillna("").astype(str)>=_c2]
+            if exp_status:
+                _skr={v:k for k,v in SL_SHORT.items()}
+                _sels={_skr[s] for s in exp_status if s in _skr}
+                _drvs_e=build_drivers(vdf_e,pdf_e,_rems(),date.today().isoformat())
+                _vids={r.get("violation_id") for d in _drvs_e if d["sk"] in _sels for r in d["rows"]}
+                vdf_e=vdf_e[vdf_e["violation_id"].isin(_vids)]
+            n_exp=len(vdf_e)
+            if n_exp==0:
+                st.info("لا توجد مخالفات تطابق الفلتر المحدد")
+            elif st.button(f"تصدير إكسل ({n_exp} مخالفة)",type="primary"):
+                with st.spinner("جاري التصدير..."):
+                    out=io.BytesIO()
+                    with pd.ExcelWriter(out,engine="openpyxl") as w:
+                        vdf_e.rename(columns={
+                            "driver_name":"السائق","phone":"الجوال","plate":"اللوحة (نظام)",
+                            "authority":"الجهة","violation_id":"رقم المخالفة",
+                            "violation_date":"التاريخ","amount":"المبلغ",
+                            "system_status":"حالة السستم","system_notified":"التبليغ (السستم)",
+                            "match_status":"حالة المطابقة","status":"الحالة",
+                            "my_notes":"ملاحظاتي","contact_date":"تاريخ التواصل",
+                        }).to_excel(w,index=False,sheet_name="المخالفات")
+                        if not pdf_e.empty: pdf_e.to_excel(w,index=False,sheet_name="المدفوعات")
+                        if not ndf_e.empty: ndf_e.to_excel(w,index=False,sheet_name="سجل التواصل")
+                    out.seek(0)
+                st.download_button("تحميل الملف",out,
+                    file_name=f"Workrance_{date.today()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary")
 
     with t4:
         st.markdown("### تصحيح الحالات")
