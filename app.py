@@ -542,15 +542,16 @@ PR = {"reminder":0,"new":1,"check":2,"pending":3,"partial":4,
       "notified":5,"done":6,"no_contact":7,"no_phone":8,"no_wa":9}
 
 STAT_CFG = [
-    ("new",      "#ef4444", "alert",     "جديد"),
-    ("reminder", "#f97316", "bell",      "تذكير"),
-    ("check",    "#eab308", "clock",     "تشيك"),
-    ("pending",  "#f97316", "hourglass", "معلق"),
-    ("partial",  "#a855f7", "dollar",    "جزئي"),
-    ("notified", "#3b82f6", "send",      "تبليغ"),
-    ("done",     "#22c55e", "check-c",   "تم"),
-    ("no_phone", "#475569", "phone",     "بلا رقم"),
-    ("no_wa",    "#475569", "msg",       "بلا واتساب"),
+    ("new",        "#ef4444", "alert",     "جديد"),
+    ("reminder",   "#f97316", "bell",      "تذكير"),
+    ("check",      "#eab308", "clock",     "تشيك"),
+    ("pending",    "#f97316", "hourglass", "معلق"),
+    ("partial",    "#a855f7", "dollar",    "جزئي"),
+    ("notified",   "#3b82f6", "send",      "تبليغ"),
+    ("done",       "#22c55e", "check-c",   "تم"),
+    ("no_contact", "#334155", "x-c",       "لا داعي"),
+    ("no_phone",   "#475569", "phone",     "بلا رقم"),
+    ("no_wa",      "#475569", "msg",       "بلا واتساب"),
 ]
 
 # ══════════════════════════════════════════════════════════
@@ -1137,7 +1138,7 @@ def pg_drivers(user):
                             vid = sv.get("violation_id","")
                             add_payment(vid,sel["name"],sel["phone"],sel["plate"],
                                         amt,pt,pm,rurl,rref if pm=="تحويل بنكي" else "",
-                                        col,other,verif,pd_.strftime("%d-%m-%Y"),pnts)
+                                        col,other,verif,pd_.strftime("%Y-%m-%d"),pnts)
                             today_d,_,full_d=now_sa_str()
                             new_vst=(f"تم الدفع {full_d}" if pt=="كامل"
                                      else f"مدفوع جزئي {full_d}")
