@@ -1321,7 +1321,7 @@ def pg_reports():
 def pg_admin():
     st.markdown(f'<div class="pg-hdr">{ico("settings",22,"#60a5fa")} الإدارة</div>',
                 unsafe_allow_html=True)
-    t1,t2,t3=st.tabs(["رفع إكسل","إضافة مخالفة","تصدير"])
+    t1,t2,t3,t4=st.tabs(["رفع إكسل","إضافة مخالفة","تصدير","تصحيح الحالات"])
 
     with t1:
         st.markdown("### رفع إكسل جديد ودمجه")
@@ -1434,6 +1434,93 @@ def pg_admin():
                 file_name=f"Workrance_{date.today()}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 type="primary")
+
+    with t4:
+        st.markdown("### تصحيح الحالات")
+        st.info("يقارن سجل التبليغات والمدفوعات بحالات المخالفات الحالية، ويصحح كل مخالفة ما اتحدث حالتها رغم وجود سجل لها.")
+        if st.button("فحص البيانات", type="primary", key="fix_scan"):
+            with st.spinner("جاري الفحص …"):
+                vdf_=_viols(); pdf_=_pays(); ndf_=_notifs()
+                viols_  = vdf_.to_dict("records") if not vdf_.empty else []
+                pays_   = pdf_.to_dict("records") if not pdf_.empty else []
+                notifs_ = ndf_.to_dict("records") if not ndf_.empty else []
+
+                def _n(v):
+                    s=str(v).strip() if v else ""
+                    return "" if s in ("بلا رقم","غير محدد","nan","None") else s
+
+                # فهرسة التبليغات
+                notif_keys=set()
+                for n in notifs_:
+                    notif_keys.add((_n(n.get("driver_name")),_n(n.get("phone")),_n(n.get("plate"))))
+
+                # فهرسة المدفوعات بـ violation_id
+                paid={}
+                for p in pays_:
+                    vid=str(p.get("violation_id","")).strip()
+                    if not vid: continue
+                    confirmed=p.get("verification_status","")=="مؤكد"
+                    full=p.get("payment_type","")=="كامل"
+                    prev=paid.get(vid)
+                    if prev is None or (confirmed and not prev["confirmed"]) or \
+                       (confirmed==prev["confirmed"] and full and not prev["full"]):
+                        paid[vid]={"full":full,"confirmed":confirmed}
+
+                fix_paid=[]; fix_partial=[]; fix_notified=[]
+                for v in viols_:
+                    vid=str(v.get("violation_id","")).strip()
+                    cur=str(v.get("status","")).strip()
+                    key=(_n(v.get("driver_name")),_n(v.get("phone")),_n(v.get("plate")))
+                    already_paid=any(w in cur for w in ("تم الدفع","مدفوع"))
+                    already_notif=any(w in cur for w in ("تم التبليغ","تم التبيلغ"))
+                    is_new=cur in ("جديد","","لم يتم","لم يتم التواصل")
+                    if vid in paid and not already_paid:
+                        if paid[vid]["full"] and paid[vid]["confirmed"]: fix_paid.append(v); continue
+                        elif not paid[vid]["full"]: fix_partial.append(v); continue
+                    if key in notif_keys and is_new and not already_notif:
+                        fix_notified.append(v)
+
+                total=len(fix_paid)+len(fix_partial)+len(fix_notified)
+                st.session_state["_fix_paid"]=fix_paid
+                st.session_state["_fix_partial"]=fix_partial
+                st.session_state["_fix_notified"]=fix_notified
+
+            if total==0:
+                st.success("✅ كل شيء مزبوط — ما في شيء يحتاج إصلاح")
+            else:
+                st.warning(f"وُجد {total} مخالفة تحتاج تصحيح")
+                col1,col2,col3=st.columns(3)
+                col1.metric("تم الدفع",len(fix_paid))
+                col2.metric("دفع جزئي",len(fix_partial))
+                col3.metric("تم التبليغ",len(fix_notified))
+                for lbl,lst in [("تم الدفع",fix_paid),("مدفوع جزئي",fix_partial),("تم التبليغ",fix_notified)]:
+                    if lst:
+                        with st.expander(f"{lbl} ({len(lst)})"):
+                            for v in lst:
+                                st.markdown(f"- **{v.get('driver_name','؟')}** · {v.get('plate','؟')} · حالة حالية: `{v.get('status','')}`")
+
+        fix_paid_s    = st.session_state.get("_fix_paid",[])
+        fix_partial_s = st.session_state.get("_fix_partial",[])
+        fix_notified_s= st.session_state.get("_fix_notified",[])
+        total_s=len(fix_paid_s)+len(fix_partial_s)+len(fix_notified_s)
+        if total_s>0:
+            st.divider()
+            if st.button(f"تصحيح {total_s} مخالفة الآن", type="primary", key="fix_apply"):
+                fixed=errors=0
+                for status_val,lst in [("تم الدفع",fix_paid_s),("مدفوع جزئي",fix_partial_s),("تم التبليغ",fix_notified_s)]:
+                    for v in lst:
+                        r=_hx.patch(f"{_base()}/rest/v1/violations",
+                                    params={"violation_id":f"eq.{v['violation_id']}"},
+                                    json={"status":status_val},
+                                    headers=_h({"Prefer":"return=minimal"}),timeout=30)
+                        if r.status_code in (200,204): fixed+=1
+                        else: errors+=1
+                bust()
+                for k in ("_fix_paid","_fix_partial","_fix_notified"):
+                    st.session_state.pop(k,None)
+                if errors: st.warning(f"تم تصحيح {fixed} | فشل {errors}")
+                else: st.success(f"✅ تم تصحيح {fixed} مخالفة بنجاح")
+                st.rerun()
 
 # ══════════════════════════════════════════════════════════
 # PAGE: التذكيرات
