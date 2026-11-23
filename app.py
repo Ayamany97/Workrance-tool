@@ -546,6 +546,7 @@ STAT_CFG = [
     ("reminder", "#f97316", "bell",      "تذكير"),
     ("check",    "#eab308", "clock",     "تشيك"),
     ("pending",  "#f97316", "hourglass", "معلق"),
+    ("partial",  "#a855f7", "dollar",    "جزئي"),
     ("notified", "#3b82f6", "send",      "تبليغ"),
     ("done",     "#22c55e", "check-c",   "تم"),
     ("no_phone", "#475569", "phone",     "بلا رقم"),
@@ -859,7 +860,7 @@ def pg_drivers(user):
                          else f'{ico("x-c",15,"#ef4444")}')
             paid_lbl = " — مدفوعة" if paid and vid in dpays_vids else ""
             st.markdown('<div class="viol-act-row">', unsafe_allow_html=True)
-            vc1, vc2, vc3, vc4, vc5 = st.columns([6, 1, 1, 1, 1])
+            vc1, vc2, vc3, vc4, vc5, vc6 = st.columns([5, 1, 1, 1, 1, 1])
             with vc1:
                 st.markdown(
                     f'<div class="viol-row {"viol-paid" if paid else "viol-unpaid"}">'
@@ -879,7 +880,7 @@ def pg_drivers(user):
                         st.session_state.pop("nowa_v", None)
                     else:
                         st.session_state["nowa_v"] = vid
-                        for _k in ("paid_v","edit_v","del_confirm"): st.session_state.pop(_k, None)
+                        for _k in ("paid_v","chk_v","edit_v","del_confirm"): st.session_state.pop(_k, None)
                     st.rerun()
             with vc3:
                 if not paid and st.button("💵", key=f"pq_{vid}", use_container_width=True, help="مدفوعة"):
@@ -887,23 +888,31 @@ def pg_drivers(user):
                         st.session_state.pop("paid_v", None)
                     else:
                         st.session_state["paid_v"] = vid
-                        for _k in ("nowa_v","edit_v","del_confirm"): st.session_state.pop(_k, None)
+                        for _k in ("nowa_v","chk_v","edit_v","del_confirm"): st.session_state.pop(_k, None)
                     st.rerun()
             with vc4:
+                if not paid and st.button("⏰", key=f"chk_{vid}", use_container_width=True, help="تشيك"):
+                    if st.session_state.get("chk_v") == vid:
+                        st.session_state.pop("chk_v", None)
+                    else:
+                        st.session_state["chk_v"] = vid
+                        for _k in ("nowa_v","paid_v","edit_v","del_confirm"): st.session_state.pop(_k, None)
+                    st.rerun()
+            with vc5:
                 if st.button("✏️", key=f"ev_{vid}", use_container_width=True, help="تعديل"):
                     if st.session_state.get("edit_v") == vid:
                         st.session_state.pop("edit_v", None)
                     else:
                         st.session_state["edit_v"] = vid
-                        for _k in ("nowa_v","paid_v","del_confirm"): st.session_state.pop(_k, None)
+                        for _k in ("nowa_v","paid_v","chk_v","del_confirm"): st.session_state.pop(_k, None)
                     st.rerun()
-            with vc5:
+            with vc6:
                 if st.button("🗑️", key=f"dv_{vid}", use_container_width=True, help="حذف"):
                     if st.session_state.get("del_confirm") == vid:
                         st.session_state.pop("del_confirm", None)
                     else:
                         st.session_state["del_confirm"] = vid
-                        for _k in ("nowa_v","paid_v","edit_v"): st.session_state.pop(_k, None)
+                        for _k in ("nowa_v","paid_v","chk_v","edit_v"): st.session_state.pop(_k, None)
                         st.toast("⚠ اضغط تأكيد لإتمام الحذف")
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
@@ -922,6 +931,22 @@ def pg_drivers(user):
                 with nw2:
                     if st.button("إلغاء", key=f"nwcan_{vid}", use_container_width=True):
                         st.session_state.pop("nowa_v", None)
+                        st.rerun()
+
+            # ── تشيك confirmation ──
+            if st.session_state.get("chk_v") == vid:
+                st.info(f"تعيين **{sel['name']}** كـ تشيك؟ (سيُطبَّق على جميع مخالفاته)")
+                ch1, ch2 = st.columns(2)
+                with ch1:
+                    if st.button("تأكيد", type="primary", key=f"chkok_{vid}", use_container_width=True):
+                        upd_driver_status(sel["rows"], "تشيك")
+                        st.toast(f"✓ {sel['name']} — تشيك")
+                        st.session_state.pop("chk_v", None)
+                        st.session_state["sel"] = None
+                        bust(); st.rerun()
+                with ch2:
+                    if st.button("إلغاء", key=f"chkcan_{vid}", use_container_width=True):
+                        st.session_state.pop("chk_v", None)
                         st.rerun()
 
             # ── مدفوعة quick form ──
