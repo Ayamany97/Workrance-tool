@@ -835,6 +835,24 @@ def pg_drivers(user):
             if st.button("رجوع", key="back_drv", use_container_width=True):
                 st.session_state.sel=None; st.rerun()
 
+        # prior-history warning (set during import from classified file)
+        _warn_note = str(sel.get("note","")).strip()
+        if _warn_note.startswith("⚠️"):
+            _warn_lines = _warn_note.replace("⚠️","").strip().split(" || ")
+            _warn_html = "".join(
+                f'<div style="margin:3px 0;font-size:12px;color:#fbbf24">'
+                f'  {ico("alert",13,"#fbbf24")} {ln.strip()}'
+                f'</div>'
+                for ln in _warn_lines if ln.strip()
+            )
+            st.markdown(
+                f'<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.25);'
+                f'border-right:4px solid #eab308;border-radius:10px;padding:10px 13px;margin-bottom:10px">'
+                f'<div style="font-size:12px;font-weight:700;color:#fbbf24;margin-bottom:5px">'
+                f'{ico("alert",14,"#eab308")} تنبيه — لهذا السائق مخالفات على لوحات أخرى:</div>'
+                f'{_warn_html}</div>',
+                unsafe_allow_html=True)
+
         # reminder alert
         rem = sel.get("rem",{})
         if rem.get("reminder_date"):
@@ -1333,7 +1351,7 @@ def pg_reports():
 def pg_admin():
     st.markdown(f'<div class="pg-hdr">{ico("settings",22,"#60a5fa")} الإدارة</div>',
                 unsafe_allow_html=True)
-    t1,t2,t3,t4=st.tabs(["رفع إكسل","إضافة مخالفة","تصدير","تصحيح الحالات"])
+    t1,t2,t3,t4,t5=st.tabs(["رفع إكسل","إضافة مخالفة","تصدير","تصحيح الحالات","استيراد مصنّف"])
 
     with t1:
         st.markdown("### رفع إكسل جديد ودمجه")
@@ -1552,6 +1570,163 @@ def pg_admin():
                 if errors: st.warning(f"تم تصحيح {fixed} | فشل {errors}")
                 else: st.success(f"✅ تم تصحيح {fixed} مخالفة بنجاح")
                 st.rerun()
+
+    with t5:
+        import re as _re, uuid as _uuid
+        st.markdown("### استيراد ملف تحديث أحمد المصنّف")
+        st.info(
+            "ارفع ملف **تحديث اخير احمد - مصنف.xlsx** — سيُحدَّث كل سائق موجود "
+            "بحالته الجديدة، وتُضاف مخالفات السائقين الجدد تلقائياً."
+        )
+
+        _STATUS_MAP = {
+            'مسدد':                'تم',
+            'يجب التذكير':        'تم التبليغ',
+            'يجب التذكير - جزئي': 'تم التبليغ',
+            'مختلط':              'تشيك',
+            'دفع جزئي':           'مدفوع جزئي',
+            'جديد':               'جديد',
+            'بيانات ناقصة':       'جديد',
+        }
+
+        def _np(p):
+            if p is None: return None
+            c = _re.sub(r'\s+', '', str(p).strip().upper())
+            return c if len(c) > 2 else None
+
+        def _cph(p):
+            if not p: return ''
+            s = str(p).strip().split('.')[0].replace(' ','').replace('-','')
+            return s if s.isdigit() else ''
+
+        up5 = st.file_uploader(
+            "ارفع الملف المصنّف:", type=["xlsx"], key="up_classified"
+        )
+
+        if up5 and st.button("▶ ابدأ الاستيراد", type="primary", key="run_import"):
+            with st.spinner("جاري المعالجة..."):
+                try:
+                    import openpyxl as _xl
+
+                    # جلب اللوحات الموجودة بالـ DB
+                    _r = _hx.get(
+                        f"{_base()}/rest/v1/violations"
+                        "?select=violation_id,plate",
+                        headers={**_h(), "Range-Unit":"items","Range":"0-9999"},
+                        timeout=30)
+                    _existing = _r.json() if _r.status_code == 200 else []
+                    _plate_vids = {}
+                    for _v in _existing:
+                        _p = _np(_v.get('plate'))
+                        if _p:
+                            _plate_vids.setdefault(_p, []).append(_v['violation_id'])
+
+                    _wb = _xl.load_workbook(up5, data_only=True)
+                    _ws = _wb.active
+                    _today = date.today().isoformat()
+
+                    _updated = _inserted = _rems = _skipped = _errs = 0
+                    _prog = st.progress(0)
+                    _rows = [r for r in _ws.iter_rows(min_row=12, values_only=True)
+                             if any(v is not None for v in (r[:10] if len(r)>=10 else r))]
+                    _total = len(_rows) or 1
+
+                    for _i, _row in enumerate(_rows):
+                        _prog.progress((_i+1)/_total)
+                        _plate = _np(_row[1])
+                        if not _plate:
+                            _skipped += 1; continue
+
+                        _plate_raw  = str(_row[1]).strip()
+                        _name       = str(_row[2]).strip() if _row[2] else ''
+                        _phone      = _cph(_row[3])
+                        _classif    = str(_row[13]).strip() if len(_row)>13 and _row[13] else 'جديد'
+                        _warn       = str(_row[14]).strip() if len(_row)>14 and _row[14] and str(_row[14]) not in ('None','') else ''
+                        _db_status  = _STATUS_MAP.get(_classif, 'جديد')
+
+                        _bal   = _row[4] if isinstance(_row[4],(int,float)) and _row[4] else 0
+                        _trw   = _row[5] if isinstance(_row[5],(int,float)) and _row[5] else 0
+                        _tra   = _row[6] if isinstance(_row[6],(int,float)) and _row[6] else 0
+                        _trp26 = _row[7] if isinstance(_row[7],(int,float)) and _row[7] else 0
+                        _tr26  = _row[8] if isinstance(_row[8],(int,float)) and _row[8] else 0
+
+                        _vids = _plate_vids.get(_plate, [])
+
+                        if _vids:
+                            # تحديث المخالفات الموجودة
+                            _upd = {"status": _db_status,
+                                    "updated_at": datetime.now(RIYADH).isoformat()}
+                            if _warn:
+                                _upd["my_notes"] = _warn
+                            _ids = "(" + ",".join(_vids) + ")"
+                            _r2 = _hx.patch(
+                                f"{_base()}/rest/v1/violations",
+                                params={"violation_id": f"in.{_ids}"},
+                                json=_upd,
+                                headers=_h({"Prefer":"return=minimal"}), timeout=30)
+                            if _r2.status_code in (200, 204):
+                                _updated += 1
+                            else:
+                                _errs += 1
+
+                            # تذكير لـ "يجب التذكير"
+                            if 'تذكير' in _classif and _phone:
+                                _hx.post(
+                                    f"{_base()}/rest/v1/reminders",
+                                    json={"phone": _phone, "plate": _plate_raw,
+                                          "driver_name": _name,
+                                          "reminder_date": _today,
+                                          "note": "متابعة — تم التبليغ سابقاً ولم يُسدَّد",
+                                          "created_by": "النظام", "is_done": False},
+                                    headers=_h({"Prefer":"resolution=merge-duplicates,return=minimal"}),
+                                    timeout=30)
+                                _rems += 1
+                        else:
+                            # إضافة مخالفات جديدة
+                            _cats = [
+                                ('مخالفات بلدية',             _bal),
+                                ('مخالفات وزارة النقل أوزان', _trw),
+                                ('مخالفات هيئة النقل',        _tra),
+                                ('مخالفات مرورية قبل 2026',   _trp26),
+                                ('مخالفات مرورية 2026',       _tr26),
+                            ]
+                            for _auth, _amt in _cats:
+                                if not _amt: continue
+                                _vid = f"MAN-{_plate}-{_uuid.uuid4().hex[:6].upper()}"
+                                _r4 = _hx.post(
+                                    f"{_base()}/rest/v1/violations",
+                                    json={"violation_id": _vid,
+                                          "driver_name":  _name,
+                                          "phone":        _phone,
+                                          "plate":        _plate_raw,
+                                          "authority":    _auth,
+                                          "violation_date": "",
+                                          "amount":       float(_amt),
+                                          "system_status": "معلقة",
+                                          "system_notified": "",
+                                          "match_status": "مؤكدة",
+                                          "status":       _db_status,
+                                          "my_notes":     _warn,
+                                          "contact_date": "",
+                                          "assigned_to":  "أحمد",
+                                          "manually_added": True},
+                                    headers=_h({"Prefer":"return=minimal"}), timeout=30)
+                                if _r4.status_code in (200, 201):
+                                    _inserted += 1
+                                else:
+                                    _errs += 1
+
+                    _prog.progress(1.0)
+                    bust()
+                    st.success(
+                        f"✅ اكتمل الاستيراد\n\n"
+                        f"- **محدَّث**: {_updated} سائق موجود\n"
+                        f"- **مُضاف**: {_inserted} مخالفة جديدة\n"
+                        f"- **تذكيرات**: {_rems}\n"
+                        f"- **أخطاء**: {_errs}"
+                    )
+                except Exception as _ex:
+                    st.error(f"خطأ: {_ex}")
 
 # ══════════════════════════════════════════════════════════
 # PAGE: التذكيرات
