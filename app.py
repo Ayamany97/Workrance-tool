@@ -1690,6 +1690,7 @@ def pg_admin():
                                 ('مخالفات مرورية قبل 2026',   _trp26),
                                 ('مخالفات مرورية 2026',       _tr26),
                             ]
+                            _cat_inserted = 0
                             for _auth, _amt in _cats:
                                 if not _amt: continue
                                 _vid = f"MAN-{_plate}-{_uuid.uuid4().hex[:6].upper()}"
@@ -1713,8 +1714,21 @@ def pg_admin():
                                     headers=_h({"Prefer":"return=minimal"}), timeout=30)
                                 if _r4.status_code in (200, 201):
                                     _inserted += 1
+                                    _cat_inserted += 1
                                 else:
                                     _errs += 1
+                            # تذكير لـ "يجب التذكير" حتى في مسار الإضافة
+                            if 'تذكير' in _classif and _phone and _cat_inserted > 0:
+                                _hx.post(
+                                    f"{_base()}/rest/v1/reminders",
+                                    json={"phone": _phone, "plate": _plate_raw,
+                                          "driver_name": _name,
+                                          "reminder_date": _today,
+                                          "note": "متابعة — تم التبليغ سابقاً ولم يُسدَّد",
+                                          "created_by": "النظام", "is_done": False},
+                                    headers=_h({"Prefer":"resolution=merge-duplicates,return=minimal"}),
+                                    timeout=30)
+                                _rems += 1
 
                     _prog.progress(1.0)
                     bust()
@@ -1722,11 +1736,60 @@ def pg_admin():
                         f"✅ اكتمل الاستيراد\n\n"
                         f"- **محدَّث**: {_updated} سائق موجود\n"
                         f"- **مُضاف**: {_inserted} مخالفة جديدة\n"
-                        f"- **تذكيرات**: {_rems}\n"
+                        f"- **تذكيرات مضبوطة**: {_rems}\n"
                         f"- **أخطاء**: {_errs}"
                     )
                 except Exception as _ex:
                     st.error(f"خطأ: {_ex}")
+
+        st.divider()
+        st.markdown("#### ضبط تذكيرات التبليغ السابق")
+        st.info(
+            "للسائقين الموجودين بالـ DB بحالة **تم التبليغ** وليس عندهم تذكير — "
+            "يضبط لهم تذكير على اليوم فيظهروا أعلى القائمة 🔔"
+        )
+        if st.button("ضبط التذكيرات", key="fix_reminders"):
+            with st.spinner("جاري الضبط..."):
+                try:
+                    _vdf_r = _viols()
+                    if _vdf_r.empty:
+                        st.warning("لا توجد بيانات")
+                    else:
+                        _notified = _vdf_r[
+                            _vdf_r["status"].fillna("").str.contains("تم التبليغ")
+                        ][["driver_name","phone","plate"]].drop_duplicates(
+                            subset=["phone","plate"])
+                        _existing_rems = _rems()
+                        _today_r = date.today().isoformat()
+                        _set = _skip = _err = 0
+                        for _, _rv in _notified.iterrows():
+                            _ph = cp(_rv.get("phone",""))
+                            _pl = str(_rv.get("plate","")).strip()
+                            _nm = str(_rv.get("driver_name","")).strip()
+                            if not _ph or not _pl: _skip += 1; continue
+                            _rk = f"{_ph}_{_pl}"
+                            if _rk in _existing_rems: _skip += 1; continue
+                            _r5 = _hx.post(
+                                f"{_base()}/rest/v1/reminders",
+                                json={"phone": _ph, "plate": _pl,
+                                      "driver_name": _nm,
+                                      "reminder_date": _today_r,
+                                      "note": "متابعة — تم التبليغ سابقاً ولم يُسدَّد",
+                                      "created_by": "النظام", "is_done": False},
+                                headers=_h({"Prefer":"resolution=merge-duplicates,return=minimal"}),
+                                timeout=30)
+                            if _r5.status_code in (200, 201, 204):
+                                _set += 1
+                            else:
+                                _err += 1
+                        bust()
+                        st.success(
+                            f"✅ **{_set}** تذكير مضبوط | "
+                            f"**{_skip}** متخطّى (موجود أو بلا رقم) | "
+                            f"**{_err}** خطأ"
+                        )
+                except Exception as _ex2:
+                    st.error(f"خطأ: {_ex2}")
 
 # ══════════════════════════════════════════════════════════
 # PAGE: التذكيرات
