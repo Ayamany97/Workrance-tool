@@ -538,16 +538,14 @@ SL_SHORT = {
     "partial":"جزئي","notified":"تبليغ","done":"تم",
     "no_contact":"لا داعي","no_phone":"بلا رقم","no_wa":"بلا واتساب",
 }
-PR = {"reminder":0,"new":1,"check":2,"pending":3,"partial":4,
-      "notified":5,"done":6,"no_contact":7,"no_phone":8,"no_wa":9}
+PR = {"reminder":0,"new":1,"check":2,"pending":3,
+      "done":4,"no_contact":5,"no_phone":6,"no_wa":7}
 
 STAT_CFG = [
     ("new",        "#ef4444", "alert",     "جديد"),
     ("reminder",   "#f97316", "bell",      "تذكير"),
     ("check",      "#eab308", "clock",     "تشيك"),
     ("pending",    "#f97316", "hourglass", "معلق"),
-    ("partial",    "#a855f7", "dollar",    "جزئي"),
-    ("notified",   "#3b82f6", "send",      "تبليغ"),
     ("done",       "#22c55e", "check-c",   "تم"),
     ("no_contact", "#334155", "x-c",       "لا داعي"),
     ("no_phone",   "#475569", "phone",     "بلا رقم"),
@@ -630,7 +628,9 @@ def build_drivers(vdf, pdf, rems, today_iso):
     for key, rows in groups.items():
         name, phone, plate = key
         sk  = get_sk([r.get("status","") for r in rows])
-        if phone == "بلا رقم" and sk in ("new", "pending"):
+        if sk == 'notified': sk = 'reminder'  # تبليغ → تذكير دائماً
+        if sk == 'partial':  sk = 'check'     # جزئي → تشيك
+        if phone == "بلا رقم" and sk in ("new", "pending", "check"):
             sk = "no_phone"
         rk  = f"{phone}_{plate}"
         if rk in rems and not rems[rk].get("is_done") and str(rems[rk].get("reminder_date","9999")) <= today_iso:
@@ -646,6 +646,14 @@ def build_drivers(vdf, pdf, rems, today_iso):
                         if p.get("verification_status") == "مؤكد"
                         and p.get("violation_id") in {r.get("violation_id") for r in prows})
         remaining = max(0, tp - conf_paid)
+        # auto-upgrade: system paid → لا داعي (don't show as جديد+0ر)
+        if sk not in ('done', 'no_contact', 'no_phone', 'no_wa', 'reminder') and not prows and rows:
+            if all(str(r.get("system_status","")).strip() in ('مدفوعة', 'مدفوع') for r in rows):
+                sk = 'no_contact'
+        # auto-upgrade: all amounts = 0 → لا داعي
+        if sk not in ('done', 'no_contact', 'no_phone', 'no_wa', 'reminder') and remaining == 0 and tp == 0:
+            if not any(float(r.get('amount') or 0) for r in rows):
+                sk = 'no_contact'
         latest_note = next((str(r.get("my_notes","")).strip() for r in sorted(rows, key=lambda x: str(x.get("contact_date","") or ""), reverse=True) if str(r.get("my_notes","")).strip() not in ("","nan","None")), "")
         result.append({
             "key":key, "name":name, "phone":phone, "plate":plate,
@@ -688,14 +696,12 @@ def pg_drivers(user):
     with st.sidebar:
         show_all = st.toggle("عرض الكل", value=False)
         if show_all:
-            fn=fr=fc=fp=fpa=fnt=fd=fnph=fnwa=fnc=True
+            fn=fr=fc=fp=fd=fnph=fnwa=fnc=True
         else:
             fn  = st.checkbox(f"🔴 جديد ({cnt.get('new',0)})",          value=True)
             fr  = st.checkbox(f"🔔 تذكير ({cnt.get('reminder',0)})",     value=True)
             fc  = st.checkbox(f"🟡 تشيك ({cnt.get('check',0)})",         value=True)
             fp  = st.checkbox(f"🟠 معلق ({cnt.get('pending',0)})",       value=True)
-            fpa = st.checkbox(f"🟣 جزئي ({cnt.get('partial',0)})",       value=True)
-            fnt = st.checkbox(f"🔵 تبليغ ({cnt.get('notified',0)})",     value=False)
             fd  = st.checkbox(f"🟢 تم ({cnt.get('done',0)})",            value=False)
             fnph= st.checkbox(f"⚫ بلا رقم ({cnt.get('no_phone',0)})",   value=True)
             fnwa= st.checkbox(f"⚫ بلا واتساب ({cnt.get('no_wa',0)})",   value=True)
@@ -724,14 +730,14 @@ def pg_drivers(user):
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True, key="exp_noph")
 
-    fm={"new":fn,"reminder":fr,"check":fc,"pending":fp,"partial":fpa,"notified":fnt,"done":fd,
+    fm={"new":fn,"reminder":fr,"check":fc,"pending":fp,"done":fd,
         "no_phone":fnph,"no_wa":fnwa,"no_contact":fnc}
     shown=[d for d in drivers
            if fm.get(d["sk"],True)
            and (not srch or srch in d["name"] or srch.upper() in d["plate"].upper())]
 
     # pagination — reset page when search/filter changes
-    _filter_sig = f"{srch}|{fn}{fr}{fc}{fp}{fpa}{fnt}{fd}{fnph}{fnwa}{fnc}"
+    _filter_sig = f"{srch}|{fn}{fr}{fc}{fp}{fd}{fnph}{fnwa}{fnc}"
     if st.session_state.get("_fsig") != _filter_sig:
         st.session_state["_fsig"] = _filter_sig
         st.session_state["drv_page"] = 0
@@ -1584,7 +1590,7 @@ def pg_admin():
             'يجب التذكير':        'تم التبليغ',
             'يجب التذكير - جزئي': 'تم التبليغ',
             'مختلط':              'تشيك',
-            'دفع جزئي':           'مدفوع جزئي',
+            'دفع جزئي':           'تشيك',
             'جديد':               'جديد',
             'بيانات ناقصة':       'جديد',
         }
@@ -1626,17 +1632,19 @@ def pg_admin():
                     _today = date.today().isoformat()
 
                     _updated = _inserted = _rem_cnt = _skipped = _errs = 0
+                    _processed_plates = set()
                     _prog = st.progress(0)
                     _rows = [r for r in _ws.iter_rows(min_row=12, values_only=True)
                              if any(v is not None for v in (r[:10] if len(r)>=10 else r))]
                     _total = len(_rows) or 1
 
                     for _i, _row in enumerate(_rows):
-                        _prog.progress((_i+1)/_total)
+                        _prog.progress((_i+1)/_total * 0.7)
                         _plate = _np(_row[1])
                         if not _plate:
                             _skipped += 1; continue
 
+                        _processed_plates.add(_plate)
                         _plate_raw  = str(_row[1]).strip()
                         _name       = str(_row[2]).strip() if _row[2] else ''
                         _phone      = _cph(_row[3])
@@ -1730,13 +1738,52 @@ def pg_admin():
                                     timeout=30)
                                 _rem_cnt += 1
 
+                    # ── مزامنة اللوحات القديمة (غير موجودة بملف أحمد) ──
+                    _prog.progress(0.75)
+                    _all_r = _hx.get(
+                        f"{_base()}/rest/v1/violations"
+                        "?select=violation_id,plate,status,system_status,amount",
+                        headers={**_h(), "Range-Unit":"items","Range":"0-9999"},
+                        timeout=30)
+                    _all_v = _all_r.json() if _all_r.status_code == 200 else []
+
+                    _old_ladaday = []
+                    _old_pending = []
+                    for _vv in _all_v:
+                        _pp = _np(_vv.get('plate'))
+                        if not _pp or _pp in _processed_plates:
+                            continue
+                        _cur = str(_vv.get('status','')).strip()
+                        if _cur == 'تم':
+                            continue
+                        _sst = str(_vv.get('system_status','')).strip()
+                        _a   = float(_vv.get('amount') or 0)
+                        if _a == 0 or _sst in ('مدفوعة', 'مدفوع'):
+                            _old_ladaday.append(_vv['violation_id'])
+                        else:
+                            _old_pending.append(_vv['violation_id'])
+
+                    def _do_patch(vids, new_st):
+                        for _bi in range(0, len(vids), 200):
+                            _b = vids[_bi:_bi+200]
+                            _hx.patch(
+                                f"{_base()}/rest/v1/violations",
+                                params={"violation_id": f"in.({',' .join(_b)})"},
+                                json={"status": new_st,
+                                      "updated_at": datetime.now(RIYADH).isoformat()},
+                                headers=_h({"Prefer":"return=minimal"}), timeout=30)
+
+                    if _old_ladaday: _do_patch(_old_ladaday, 'لا داعي للتواصل')
+                    if _old_pending:  _do_patch(_old_pending,  'معلق')
                     _prog.progress(1.0)
                     bust()
                     st.success(
-                        f"✅ اكتمل الاستيراد\n\n"
-                        f"- **محدَّث**: {_updated} سائق موجود\n"
-                        f"- **مُضاف**: {_inserted} مخالفة جديدة\n"
+                        f"✅ اكتمل الاستيراد والمزامنة الكاملة\n\n"
+                        f"- **محدَّث (ملف أحمد)**: {_updated}\n"
+                        f"- **مُضاف (جديد)**: {_inserted} مخالفة\n"
                         f"- **تذكيرات مضبوطة**: {_rem_cnt}\n"
+                        f"- **قديم → معلق**: {len(_old_pending)} مخالفة\n"
+                        f"- **قديم → لا داعي**: {len(_old_ladaday)} مخالفة\n"
                         f"- **أخطاء**: {_errs}"
                     )
                 except Exception as _ex:
