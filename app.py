@@ -1595,9 +1595,17 @@ def pg_admin():
             'بيانات ناقصة':       'جديد',
         }
 
+        _AR_PLATE = {
+            'أ':'A','ا':'A','إ':'A','آ':'A','ب':'B','ت':'T','ث':'T',
+            'ج':'J','ح':'H','خ':'X','د':'D','ذ':'D','ر':'R','ز':'Z',
+            'س':'S','ش':'S','ص':'X','ض':'D','ط':'T','ظ':'Z','ع':'E',
+            'غ':'G','ف':'F','ق':'Q','ك':'K','ل':'L','م':'M','ن':'N',
+            'ه':'H','و':'V','ي':'Y',
+        }
         def _np(p):
             if p is None: return None
-            c = _re.sub(r'\s+', '', str(p).strip().upper())
+            c = _re.sub(r'\s+', '', str(p).strip())
+            c = ''.join(_AR_PLATE.get(ch, ch) for ch in c).upper()
             return c if len(c) > 2 else None
 
         def _cph(p):
@@ -1621,6 +1629,18 @@ def pg_admin():
                         headers={**_h(), "Range-Unit":"items","Range":"0-9999"},
                         timeout=30)
                     _existing = _r.json() if _r.status_code == 200 else []
+
+                    # حذف اللوحات العربية من الاستيراد الأول الغلط
+                    _ar_del = [_v['violation_id'] for _v in _existing
+                               if _re.search(r'[؀-ۿ]', str(_v.get('plate','')))]
+                    if _ar_del:
+                        for _bi in range(0, len(_ar_del), 200):
+                            _b = _ar_del[_bi:_bi+200]
+                            _hx.delete(f"{_base()}/rest/v1/violations",
+                                       params={"violation_id": f"in.({','.join(_b)})"},
+                                       headers=_h({"Prefer":"return=minimal"}), timeout=30)
+                        _existing = [_v for _v in _existing if _v['violation_id'] not in set(_ar_del)]
+
                     _plate_vids = {}
                     for _v in _existing:
                         _p = _np(_v.get('plate'))
@@ -1645,7 +1665,7 @@ def pg_admin():
                             _skipped += 1; continue
 
                         _processed_plates.add(_plate)
-                        _plate_raw  = str(_row[1]).strip()
+                        _plate_raw  = _np(_row[1]) or str(_row[1]).strip()
                         _name       = str(_row[2]).strip() if _row[2] else ''
                         _phone      = _cph(_row[3])
                         _classif    = str(_row[13]).strip() if len(_row)>13 and _row[13] else 'جديد'
