@@ -1836,6 +1836,33 @@ def pg_admin():
                     st.error(f"خطأ: {_ex}")
 
         st.divider()
+        st.markdown("#### حذف اللوحات العربية المكررة")
+        st.warning("يحذف كل المخالفات ذات اللوحات العربية (من الاستيراد الأول الغلط) — شغّله مرة واحدة فقط")
+        if st.button("🗑 تنظيف فوري", key="del_arabic_plates"):
+            with st.spinner("جاري الحذف..."):
+                try:
+                    import re as _re2
+                    _all_r = _hx.get(
+                        f"{_base()}/rest/v1/violations?select=violation_id,plate",
+                        headers={**_h(),"Range-Unit":"items","Range":"0-9999"}, timeout=30)
+                    _all_v = _all_r.json() if _all_r.status_code==200 else []
+                    _ar_ids = [v['violation_id'] for v in _all_v
+                               if _re2.search(r'[؀-ۿ]', str(v.get('plate','')))]
+                    _deleted = 0
+                    for _bi in range(0, len(_ar_ids), 100):
+                        _b = _ar_ids[_bi:_bi+100]
+                        _ids_q = ','.join(_b)
+                        _rd = _hx.delete(
+                            f"{_base()}/rest/v1/violations?violation_id=in.({_ids_q})",
+                            headers=_h({"Prefer":"return=minimal"}), timeout=30)
+                        if _rd.status_code in (200,204):
+                            _deleted += len(_b)
+                    bust()
+                    st.success(f"✅ حُذف {_deleted} مخالفة بلوحات عربية")
+                except Exception as _ex:
+                    st.error(f"خطأ: {_ex}")
+
+        st.divider()
         st.markdown("#### ضبط تذكيرات التبليغ السابق")
         st.info(
             "للسائقين الموجودين بالـ DB بحالة **تم التبليغ** وليس عندهم تذكير — "
