@@ -1595,18 +1595,38 @@ def pg_admin():
             'بيانات ناقصة':       'جديد',
         }
 
+        # الخريطة الصحيحة مبنية من البيانات الفعلية (ليست تعريب لغوي)
         _AR_PLATE = {
-            'أ':'A','ا':'A','إ':'A','آ':'A','ب':'B','ت':'T','ث':'T',
-            'ج':'J','ح':'H','خ':'X','د':'D','ذ':'D','ر':'R','ز':'Z',
-            'س':'S','ش':'S','ص':'X','ض':'D','ط':'T','ظ':'Z','ع':'E',
-            'غ':'G','ف':'F','ق':'Q','ك':'K','ل':'L','م':'M','ن':'N',
-            'ه':'H','و':'V','ي':'Y',
+            'ا':'A','أ':'A','إ':'A','آ':'A',
+            'ب':'B',
+            'ت':'T','ط':'T',
+            'ح':'J','ج':'J',
+            'د':'D',
+            'ر':'R',
+            'س':'S','ش':'S',
+            'ص':'X',
+            'ع':'E',
+            'ق':'G',
+            'ك':'K',
+            'ل':'L',
+            'م':'Z',
+            'ن':'N',
+            'ه':'H',
+            'و':'U',
+            'ي':'V','ى':'V',
+            'ف':'F',
         }
         def _np(p):
             if p is None: return None
             c = _re.sub(r'\s+', '', str(p).strip())
-            c = ''.join(_AR_PLATE.get(ch, ch) for ch in c).upper()
-            return c if len(c) > 2 else None
+            ar = [ch for ch in c if '؀' <= ch <= 'ۿ']
+            di = ''.join(ch for ch in c if ch.isdigit())
+            if ar:
+                # اللوحات العربية مقلوبة — عكس الترتيب قبل التحويل
+                result = ''.join(_AR_PLATE.get(ch, ch) for ch in reversed(ar)).upper() + di
+            else:
+                result = c.upper()
+            return result if len(result) > 2 else None
 
         def _cph(p):
             if not p: return ''
