@@ -566,7 +566,9 @@ def gen_notif(name, plate, viols, user, pays=None):
         "",
     ]
     for i,v in enumerate(viols,1):
-        lines.append(f"{i}) {jlbl(v.get('authority'))} - {fdt(v.get('violation_date'))} - {famt(v.get('amount'))} ريال")
+        _date_str = fdt(v.get('violation_date'))
+        _date_part = f" - {_date_str}" if _date_str else ""
+        lines.append(f"{i}) {jlbl(v.get('authority'))}{_date_part} - {famt(v.get('amount'))} ريال")
     if pays:
         total_paid = sum(float(p.get("amount_paid",0)) for p in pays)
         remaining  = max(0, total-total_paid)
