@@ -1685,7 +1685,13 @@ def pg_admin():
                             _skipped += 1; continue
 
                         _processed_plates.add(_plate)
-                        _plate_raw  = _np(_row[1]) or str(_row[1]).strip()
+                        _pn = _np(_row[1])
+                        if _pn:
+                            _lets = ''.join(c for c in _pn if c.isalpha())
+                            _digs = ''.join(c for c in _pn if c.isdigit())
+                            _plate_raw = f"{_lets} {_digs}" if _lets and _digs else _pn
+                        else:
+                            _plate_raw = str(_row[1]).strip()
                         _name       = str(_row[2]).strip() if _row[2] else ''
                         _phone      = _cph(_row[3])
                         _classif    = str(_row[13]).strip() if len(_row)>13 and _row[13] else 'جديد'
