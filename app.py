@@ -1625,7 +1625,7 @@ def pg_admin():
                     _ws = _wb.active
                     _today = date.today().isoformat()
 
-                    _updated = _inserted = _rems = _skipped = _errs = 0
+                    _updated = _inserted = _rem_cnt = _skipped = _errs = 0
                     _prog = st.progress(0)
                     _rows = [r for r in _ws.iter_rows(min_row=12, values_only=True)
                              if any(v is not None for v in (r[:10] if len(r)>=10 else r))]
@@ -1680,7 +1680,7 @@ def pg_admin():
                                           "created_by": "النظام", "is_done": False},
                                     headers=_h({"Prefer":"resolution=merge-duplicates,return=minimal"}),
                                     timeout=30)
-                                _rems += 1
+                                _rem_cnt += 1
                         else:
                             # إضافة مخالفات جديدة
                             _cats = [
@@ -1728,7 +1728,7 @@ def pg_admin():
                                           "created_by": "النظام", "is_done": False},
                                     headers=_h({"Prefer":"resolution=merge-duplicates,return=minimal"}),
                                     timeout=30)
-                                _rems += 1
+                                _rem_cnt += 1
 
                     _prog.progress(1.0)
                     bust()
@@ -1736,7 +1736,7 @@ def pg_admin():
                         f"✅ اكتمل الاستيراد\n\n"
                         f"- **محدَّث**: {_updated} سائق موجود\n"
                         f"- **مُضاف**: {_inserted} مخالفة جديدة\n"
-                        f"- **تذكيرات مضبوطة**: {_rems}\n"
+                        f"- **تذكيرات مضبوطة**: {_rem_cnt}\n"
                         f"- **أخطاء**: {_errs}"
                     )
                 except Exception as _ex:
