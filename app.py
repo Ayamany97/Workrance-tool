@@ -365,9 +365,8 @@ def upd_driver_status(rows, status, notes="", cdate=""):
     d = {"status":status,"updated_at":datetime.now(RIYADH).isoformat()}
     if cdate: d["contact_date"] = cdate
     if notes: d["my_notes"] = notes
-    ids_str = "(" + ",".join(vids) + ")"
-    _hx.patch(f"{_base()}/rest/v1/violations",
-              params={"violation_id":f"in.{ids_str}"},
+    ids_str = ",".join(vids)
+    _hx.patch(f"{_base()}/rest/v1/violations?violation_id=in.({ids_str})",
               json=d, headers=_h({"Prefer":"return=minimal"}), timeout=30)
     bust()
 
@@ -1656,11 +1655,12 @@ def pg_admin():
                     _ar_del = [_v['violation_id'] for _v in _existing
                                if _re.search(r'[؀-ۿ]', str(_v.get('plate','')))]
                     if _ar_del:
-                        for _bi in range(0, len(_ar_del), 200):
-                            _b = _ar_del[_bi:_bi+200]
-                            _hx.delete(f"{_base()}/rest/v1/violations",
-                                       params={"violation_id": f"in.({','.join(_b)})"},
-                                       headers=_h({"Prefer":"return=minimal"}), timeout=30)
+                        for _bi in range(0, len(_ar_del), 100):
+                            _b = _ar_del[_bi:_bi+100]
+                            _ids_str = ','.join(_b)
+                            _hx.delete(
+                                f"{_base()}/rest/v1/violations?violation_id=in.({_ids_str})",
+                                headers=_h({"Prefer":"return=minimal"}), timeout=30)
                         _existing = [_v for _v in _existing if _v['violation_id'] not in set(_ar_del)]
 
                     _plate_vids = {}
@@ -1714,10 +1714,9 @@ def pg_admin():
                                     "updated_at": datetime.now(RIYADH).isoformat()}
                             if _warn:
                                 _upd["my_notes"] = _warn
-                            _ids = "(" + ",".join(_vids) + ")"
+                            _ids_str2 = ",".join(_vids)
                             _r2 = _hx.patch(
-                                f"{_base()}/rest/v1/violations",
-                                params={"violation_id": f"in.{_ids}"},
+                                f"{_base()}/rest/v1/violations?violation_id=in.({_ids_str2})",
                                 json=_upd,
                                 headers=_h({"Prefer":"return=minimal"}), timeout=30)
                             if _r2.status_code in (200, 204):
@@ -1812,11 +1811,10 @@ def pg_admin():
                             _old_pending.append(_vv['violation_id'])
 
                     def _do_patch(vids, new_st):
-                        for _bi in range(0, len(vids), 200):
-                            _b = vids[_bi:_bi+200]
+                        for _bi in range(0, len(vids), 100):
+                            _b = vids[_bi:_bi+100]
                             _hx.patch(
-                                f"{_base()}/rest/v1/violations",
-                                params={"violation_id": f"in.({',' .join(_b)})"},
+                                f"{_base()}/rest/v1/violations?violation_id=in.({','.join(_b)})",
                                 json={"status": new_st,
                                       "updated_at": datetime.now(RIYADH).isoformat()},
                                 headers=_h({"Prefer":"return=minimal"}), timeout=30)
